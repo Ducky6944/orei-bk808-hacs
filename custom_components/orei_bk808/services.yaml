@@ -1,80 +1,70 @@
+---
 route:
-  name: Route Video
-  description: Route a specific input to an output
   fields:
     input:
-      name: Input Number
-      description: Input port number (1-8)
       required: true
       selector:
         number:
           min: 1
           max: 8
+          mode: box
     output:
-      name: Output Number
-      description: Output port number (1-8)
       required: true
       selector:
         number:
           min: 1
           max: 8
+          mode: box
 
 save_preset:
-  name: Save Preset
-  description: Save current routing to a preset slot
   fields:
     preset:
-      name: Preset Slot
-      description: Preset slot number (1-8)
       required: true
       selector:
         number:
           min: 1
           max: 8
+          mode: box
 
 recall_preset:
-  name: Recall Preset
-  description: Recall routing from a preset slot
   fields:
     preset:
-      name: Preset Slot
-      description: Preset slot number (1-8)
       required: true
       selector:
         number:
           min: 1
           max: 8
-
-get_status:
-  name: Get Status
-  description: Query current matrix status
+          mode: box
 
 cec_command:
-  name: Send CEC Command
-  description: Send a CEC command to an input or output
   fields:
-    target_type:
-      name: Target Type
-      description: Input or output
+    target:
       required: true
       selector:
         select:
           options:
-            - label: Input
-              value: input
-            - label: Output
-              value: output
+            - input
+            - output
     port:
-      name: Port Number
-      description: Port number (1-8)
       required: true
       selector:
         number:
           min: 1
           max: 8
+          mode: box
     command:
-      name: CEC Command
-      description: CEC command name
       required: true
       selector:
-        text:
+        select:
+          options:
+            - play
+            - pause
+            - stop
+            - standby
+            - power_on
+            - volume_up
+            - volume_down
+            - volume_mute
+
+get_status:
+  fields: {}

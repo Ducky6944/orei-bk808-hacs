@@ -152,3 +152,4 @@ class QuickActionButton(ButtonEntity):
         """Execute sequence of actions."""
         for action, target in self.actions:
             await self.coordinator.execute_quick_action(action, target)
+
