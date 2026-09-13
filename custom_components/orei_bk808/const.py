@@ -2,20 +2,18 @@
 
 DOMAIN = "orei_bk808"
 CONF_HOST = "host"
-CONF_USERNAME = "username"
-CONF_PASSWORD = "password"
 CONF_INPUT_NAMES = "input_names"
 CONF_OUTPUT_NAMES = "output_names"
 DEFAULT_TIMEOUT = 10
 
 DEFAULT_INPUT_NAMES = [
     "Input 1", "Input 2", "Input 3", "Input 4",
-    "Input 5", "Input 6", "Input 7", "Input 8"
+    "Input 5", "Input 6", "Input 7", "Input 8",
 ]
 
 DEFAULT_OUTPUT_NAMES = [
     "Output 1", "Output 2", "Output 3", "Output 4",
-    "Output 5", "Output 6", "Output 7", "Output 8"
+    "Output 5", "Output 6", "Output 7", "Output 8",
 ]
 
 SERVICE_ROUTE = "route"
@@ -38,7 +36,7 @@ CEC_OPCODES = {
     "fast_forward": 16,
     "fast_reverse": 15,
     "next_track": 12,
-    "prev_track": 11,
+    "prev_track": 13,
     "record_on": 27,
     "select": 8,
     "back": 9,
@@ -105,9 +103,6 @@ QUICK_ACTIONS = {
     ],
     "movie_night": [
         ("power_on", "All outputs"),
-    ],
-    "security_monitor": [
-        ("input_to_all_outputs", 1),
     ],
     "all_off": [
         ("standby", "All outputs"),
