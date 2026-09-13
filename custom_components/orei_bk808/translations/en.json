@@ -1,0 +1,53 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Orei BK808 Setup",
+        "description": "Enter your matrix IP address and credentials."
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect"
+    }
+  },
+  "entity": {
+    "button": {
+      "input_1_play": {
+        "name": "Input 1 Play"
+      },
+      "input_1_pause": {
+        "name": "Input 1 Pause"
+      },
+      "input_1_standby": {
+        "name": "Input 1 Standby"
+      }
+    },
+    "select": {
+      "output_1_routing": {
+        "name": "Output 1 Input"
+      },
+      "output_2_routing": {
+        "name": "Output 2 Input"
+      }
+    },
+    "switch": {
+      "matrix_power": {
+        "name": "Matrix Power"
+      },
+      "output_1_arc": {
+        "name": "Output 1 ARC"
+      },
+      "output_1_mute": {
+        "name": "Output 1 Mute"
+      }
+    },
+    "sensor": {
+      "matrix_status": {
+        "name": "Matrix Status"
+      },
+      "active_inputs": {
+        "name": "Active Inputs"
+      }
+    }
+  }
+}

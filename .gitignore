@@ -1,0 +1,24 @@
+# Home Assistant
+config/
+*.log
+*.db
+secrets.yml
+
+# Virtual environment
+venv/
+.env
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test coverage
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db

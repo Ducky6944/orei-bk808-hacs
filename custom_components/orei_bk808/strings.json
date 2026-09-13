@@ -1,0 +1,30 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Orei BK808 Setup - Step 1",
+        "description": "Enter your matrix IP address and credentials.",
+        "data": {
+          "host": "Host IP Address",
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "test_connection": {
+        "title": "Connection Failed",
+        "description": "Could not reach the matrix. Check IP, credentials, and power."
+      },
+      "naming": {
+        "title": "Connection Successful!",
+        "description": "Device found. Customize input/output names (optional)."
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect. Check IP and credentials.",
+      "unknown": "An unknown error occurred."
+    },
+    "abort": {
+      "already_configured": "Device is already configured."
+    }
+  }
+}
