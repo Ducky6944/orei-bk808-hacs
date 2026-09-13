@@ -1,0 +1,105 @@
+# LOVELACE DASHBOARD TEMPLATE
+# Import this via: Settings → Dashboards → + Add Dashboard → Import from File
+
+title: "Orei BK808 Master Control"
+icon: mdi:matrix
+path: orei-control
+panel: true
+cards:
+  - type: vertical-stack
+    cards:
+      - type: heading
+        heading: "Input Control"
+        icon: mdi:input-component
+      
+      - type: entities
+        show_header_toggle: false
+        entities:
+          - entity: select.output_1_input
+            name: Theater AVR
+          - entity: select.output_2_input
+            name: Living Room TV
+          - entity: select.output_3_input
+            name: Main Bedroom
+          - entity: select.output_4_input
+            name: Kids Bedroom
+          - entity: select.output_5_input
+            name: Guest Bedroom
+          - entity: select.output_6_input
+            name: Balcony Amp
+          - entity: select.output_7_input
+            name: Output 7
+          - entity: select.output_8_input
+            name: Output 8
+      
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: button
+            entity: button.input_1_play
+            name: Input 1 Play
+            icon: mdi:play
+          - type: button
+            entity: button.input_2_play
+            name: Input 2 Play
+            icon: mdi:play
+          - type: button
+            entity: button.input_3_play
+            name: Input 3 Play
+            icon: mdi:play
+          - type: button
+            entity: button.input_4_play
+            name: Input 4 Play
+            icon: mdi:play
+      
+      - type: heading
+        heading: "Output Controls"
+        icon: mdi:television
+      
+      - type: entities
+        show_header_toggle: false
+        entities:
+          - entity: switch.matrix_power
+            name: Matrix Power
+          - entity: button.output_1_volume_up
+            name: Output 1 Volume Up
+            icon: mdi:volume-plus
+          - entity: button.output_1_mute
+            name: Output 1 Mute
+            icon: mdi:speaker-off
+      
+      - type: heading
+        heading: "Quick Actions"
+        icon: mdi:lightning-bolt
+      
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: button
+            entity: button.game_mode
+            name: Game Mode
+            icon: mdi:gamepad-variant
+          - type: button
+            entity: button.movie_night
+            name: Movie Night
+            icon: mdi:movie
+          - type: button
+            entity: button.security_monitor
+            name: Security Monitor
+            icon: mdi:cctv
+          - type: button
+            entity: button.all_off
+            name: All Off
+            icon: mdi:power-off
+      
+      - type: heading
+        heading: "Status"
+        icon: mdi:information
+      
+      - type: entities
+        entities:
+          - entity: sensor.matrix_status
+          - entity: sensor.active_inputs
+          - entity: sensor.active_outputs
