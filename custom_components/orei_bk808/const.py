@@ -91,7 +91,7 @@ CEC_OUTPUT_COMMANDS = {
     # 12=loop 13=play 15=prev 16=next
     "power_on":        (0,  "mdi:power-cycle",        "Power On"),
     "power_off":       (1,  "mdi:power-off",          "Power Off"),
-    "mute":            (2,  "mdi:speaker-off",        "Mute"),
+    "mute":            (2,  "mdi:speaker-off",        "CEC Mute"),
     "volume_down":     (3,  "mdi:volume-minus",       "Volume Down"),
     "volume_up":       (4,  "mdi:volume-plus",        "Volume Up"),
     "enter":           (5,  "mdi:check",              "Enter"),
@@ -110,4 +110,4 @@ CEC_COMMAND_NAMES = sorted(
     set(CEC_INPUT_COMMANDS) | set(CEC_OUTPUT_COMMANDS)
 )
 
-PLATFORMS = ["button", "select", "sensor", "switch"]
+PLATFORMS = ["button", "remote", "select", "sensor", "switch"]

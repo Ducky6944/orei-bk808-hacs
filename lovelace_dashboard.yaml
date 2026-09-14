@@ -6,9 +6,11 @@
 #
 #   switch.matrix_power
 #   sensor.power / sensor.firmware / sensor.output_<N>_routed_input
-#   select.output_<N>_route
+#   select.output_<N>_route      (dedicated routing select)
+#   select.output_<N>_remote     (ROUTING + MUTE + CEC for that output)
+#   select.input_<N>_remote      (CEC actions for that input)
 #   switch.output_<N>_mute
-#   button.input_<N>_<command>
+#   button.input_<N>_<command>   (still present, optional granular control)
 #   button.output_<N>_<command>
 #
 # Entity IDs are case-insensitive and use underscores (HA slugifies).
@@ -78,7 +80,70 @@ cards:
             entity: select.output_8_route
             name: Output 8
 
-      # -------------------------------------------------- row 3: per-output state
+      # -------------------------------------------------- row 3: all-in-one remotes
+      - type: heading
+        heading: "Remotes"
+        icon: mdi:remote
+
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: selector
+            entity: select.input_1_remote
+            name: Input 1 Remote
+          - type: selector
+            entity: select.input_2_remote
+            name: Input 2 Remote
+          - type: selector
+            entity: select.input_3_remote
+            name: Input 3 Remote
+          - type: selector
+            entity: select.input_4_remote
+            name: Input 4 Remote
+          - type: selector
+            entity: select.input_5_remote
+            name: Input 5 Remote
+          - type: selector
+            entity: select.input_6_remote
+            name: Input 6 Remote
+          - type: selector
+            entity: select.input_7_remote
+            name: Input 7 Remote
+          - type: selector
+            entity: select.input_8_remote
+            name: Input 8 Remote
+
+      - type: grid
+        columns: 4
+        square: false
+        cards:
+          - type: selector
+            entity: select.output_1_remote
+            name: Output 1 Remote
+          - type: selector
+            entity: select.output_2_remote
+            name: Output 2 Remote
+          - type: selector
+            entity: select.output_3_remote
+            name: Output 3 Remote
+          - type: selector
+            entity: select.output_4_remote
+            name: Output 4 Remote
+          - type: selector
+            entity: select.output_5_remote
+            name: Output 5 Remote
+          - type: selector
+            entity: select.output_6_remote
+            name: Output 6 Remote
+          - type: selector
+            entity: select.output_7_remote
+            name: Output 7 Remote
+          - type: selector
+            entity: select.output_8_remote
+            name: Output 8 Remote
+
+      # -------------------------------------------------- row 4: per-output state
       - type: heading
         heading: "Outputs"
         icon: mdi:television
