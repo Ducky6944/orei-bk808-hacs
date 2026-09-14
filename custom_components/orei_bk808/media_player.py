@@ -12,6 +12,7 @@ card per port — HA's native media controls just work.
 """
 
 import logging
+from pathlib import Path
 
 from homeassistant.components.media_player import MediaPlayerEntity
 from homeassistant.config_entries import ConfigEntry
@@ -95,6 +96,24 @@ def _dev(host: str) -> DeviceInfo:
 _COVER_URL = "/local/orei_bk808/cover.jpg"
 
 
+# Module-level cache: the cover is read at most once per HA process and shared
+# by every media player (16 total) via `async_get_media_image`.
+_cover_cache: "tuple[bytes, str] | None" = None
+_cover_cache_loaded = False
+
+
+def _get_cover_bytes() -> "tuple[bytes, str] | None":
+    global _cover_cache, _cover_cache_loaded
+    if not _cover_cache_loaded:
+        _cover_cache_loaded = True
+        try:
+            path = Path(__file__).parent / "static" / "cover.jpg"
+            _cover_cache = (path.read_bytes(), "image/jpeg")
+        except OSError as err:
+            _LOGGER.warning("Could not read bundled cover art: %s", err)
+    return _cover_cache
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]
     hostname = str(coordinator.host).replace(".", "_")
@@ -115,9 +134,26 @@ class _BasePlayer(MediaPlayerEntity, CoordinatorEntity):
         self._side = side
         self._port = port
         self._hostname = hostname
-        # Static cover art served from the bundled static/ dir by this
-        # integration's HomeAssistantView (see http_view.py).
+        # A non-None media_image_url tells the frontend to request the image
+        # (via media_player_proxy). The actual bytes are returned by our
+        # async_get_media_image override below — no network fetch of self.
         self._attr_media_image_url = _COVER_URL
+
+    async def async_get_media_image(self) -> "tuple[bytes | None, str | None]":
+        """Return the bundled cover art directly to HA's media_player_proxy.
+
+        The stock implementation (see homeassistant/components/media_player/__init__.py)
+        re-fetches `media_image_url` over HTTP on the server side, which breaks
+        behind a reverse proxy (the self-request can't round-trip to
+        `ha.local.cbrpnk.pw`). Handing the proxy the bytes directly lets
+        every media-control card show the cover with zero network dependency.
+        Uses a module-level cache so the 472 KB file is read at most once
+        per Home Assistant process, shared by all 16 players.
+        """
+        cov = _get_cover_bytes()
+        if cov is None:
+            return None, None
+        return cov
 
     @property
     def device_info(self) -> DeviceInfo:
