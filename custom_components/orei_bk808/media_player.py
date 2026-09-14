@@ -192,20 +192,15 @@ class _MediaInputPlayer(_BasePlayer):
 
     @property
     def state(self) -> str | None:
-        # The matrix doesn't report per-device playback state; show idle
-        # while the source is routed somewhere, off otherwise.
-        routed = any(
-            self.coordinator.get_routed_input(o) == self._port
-            for o in range(1, NUM_PORTS + 1)
-        )
-        return _STATE_IDLE if routed else _STATE_OFF
+        # The device reports whether the *source* on this input is powered/on
+        # (`inactive`=1) but not playback, so we can only say idle (on, playing
+        # or standby) vs off. This is what actually lights up the history —
+        # routing alone left every port "idle" forever.
+        return _STATE_IDLE if self.coordinator.input_is_on(self._port) else _STATE_OFF
 
     @property
     def is_on(self) -> bool | None:
-        return any(
-            self.coordinator.get_routed_input(o) == self._port
-            for o in range(1, NUM_PORTS + 1)
-        )
+        return self.coordinator.input_is_on(self._port)
 
     # ---- transport
     async def async_media_play(self) -> None:
@@ -265,12 +260,13 @@ class _MediaOutputPlayer(_BasePlayer):
 
     @property
     def state(self) -> str | None:
-        src = self.coordinator.get_routed_input(self._port)
-        return _STATE_IDLE if src else _STATE_OFF
+        # The device reports whether the *sink* on this output is connected/on
+        # (`allconnect`=1) but not playback — so idle (on) vs off, not routing.
+        return _STATE_IDLE if self.coordinator.output_is_on(self._port) else _STATE_OFF
 
     @property
     def is_on(self) -> bool | None:
-        return self.coordinator.get_routed_input(self._port) is not None
+        return self.coordinator.output_is_on(self._port)
 
     @property
     def source_list(self) -> list[str] | None:
