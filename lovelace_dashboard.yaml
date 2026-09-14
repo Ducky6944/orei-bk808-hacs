@@ -6,6 +6,8 @@
 #
 #   switch.matrix_power
 #   sensor.power / sensor.firmware / sensor.output_<N>_routed_input
+#   media_player.input_<N>       (the SOURCE device on input N: transport/volume/power)
+#   media_player.output_<N>      (the SINK on output N: select_source=routing + CEC)
 #   select.output_<N>_route      (dedicated routing select)
 #   select.output_<N>_remote     (ROUTING + MUTE + CEC for that output)
 #   select.input_<N>_remote      (CEC actions for that input)
@@ -80,9 +82,78 @@ cards:
             entity: select.output_8_route
             name: Output 8
 
+      # -------------------------------------------------- row 2b: native media players
+      # One real HA media player per port. Output players include
+      # "Input source" = the routing switcher. Use these as the primary UI.
+      - type: heading
+        heading: "Media Players"
+        icon: mdi:play-circle
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: media-control
+            entity: media_player.output_1
+            name: Output 1
+          - type: media-control
+            entity: media_player.output_2
+            name: Output 2
+          - type: media-control
+            entity: media_player.output_3
+            name: Output 3
+          - type: media-control
+            entity: media_player.output_4
+            name: Output 4
+          - type: media-control
+            entity: media_player.output_5
+            name: Output 5
+          - type: media-control
+            entity: media_player.output_6
+            name: Output 6
+          - type: media-control
+            entity: media_player.output_7
+            name: Output 7
+          - type: media-control
+            entity: media_player.output_8
+            name: Output 8
+
+      - type: heading
+        heading: "Sources (inputs)"
+        icon: mdi:input
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: media-control
+            entity: media_player.input_1
+            name: Input 1
+          - type: media-control
+            entity: media_player.input_2
+            name: Input 2
+          - type: media-control
+            entity: media_player.input_3
+            name: Input 3
+          - type: media-control
+            entity: media_player.input_4
+            name: Input 4
+          - type: media-control
+            entity: media_player.input_5
+            name: Input 5
+          - type: media-control
+            entity: media_player.input_6
+            name: Input 6
+          - type: media-control
+            entity: media_player.input_7
+            name: Input 7
+          - type: media-control
+            entity: media_player.input_8
+            name: Input 8
+
       # -------------------------------------------------- row 3: all-in-one remotes
       - type: heading
-        heading: "Remotes"
+        heading: "Remotes (quick selects)"
         icon: mdi:remote
 
       - type: grid

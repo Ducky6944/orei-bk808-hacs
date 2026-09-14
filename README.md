@@ -8,6 +8,7 @@ A fully-featured Home Assistant integration for the Orei BK808 8x8 HDMI Matrix S
 ## ✨ Features
 
 - 🚀 **GUI setup wizard** with automatic connection testing (no login needed)
+- 📺 **Native HA media players** — one per port, works with standard media-player cards (play/pause/volume/power, and per-output *input source* = routing)
 - 🎮 **Full CEC control** for all inputs and outputs (device-mapped command indices)
 - 🔄 **8×8 routing matrix** — route any input to any output
 - ⚡ **Preset save/recall/rename** for instant scene switching
@@ -64,6 +65,22 @@ Per input device (source): power on/off, transport (play/pause/stop/next/previou
 Per output/display (sink): power on/off, enter, play, next/previous, loop, navigation (left/right/down), menu, mute, and volume up/down.
 
 Command indices are the device-specific values extracted from the BK808's own web UI, so each button sends exactly the CEC frame the manufacturer's UI sends.
+
+## 📦 Entities
+
+| Entity | What It Does |
+|--------|--------------|
+| `media_player.output_<N>` | A **sink** (display/AVR) on output N. **Input source** = route that input to this output. Plus CEC play / next / previous / volume / mute / power. |
+| `media_player.input_<N>` | The **source device** on input N. Transport (play / pause / stop / next / prev), volume up/down/mute, and power on/off — all CEC. |
+| `switch.matrix_power` | Whole-matrix power (standby). |
+| `switch.output_<N>_mute` | HDMI audio mute per output. |
+| `select.output_<N>_route` | Pure routing dropdown (input → output). |
+| `select.input_<N>_remote` / `select.output_<N>_remote` | All-in-one quick-action dropdowns (routing + mute + every CEC command on that port). |
+| `button.input_<N>_<cmd>` / `button.output_<N>_<cmd>` | One button per CEC command, for fine-grained dashboards. |
+| `sensor.output_<N>_routed_input` | Which input is currently routed to output N. |
+| `sensor.power` / `sensor.firmware` | Matrix power state / firmware version. |
+
+> **Tip:** For the cleanest UI, just add the 16 `media_player.*` entities — HA's native **media-control** card already gives you play/pause/volume/power, and the output players include the routing "Input source" picker. Hide the `button.*` / `select.*` entities if you don't need the granular view.
 
 ## 🔧 Services
 
