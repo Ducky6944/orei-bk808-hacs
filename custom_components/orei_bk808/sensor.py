@@ -1,154 +1,98 @@
-"""Sensor platform for Orei BK808 status."""
+"""Sensor platform — matrix state readouts."""
 
 import logging
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo, EntityCategory
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, NUM_PORTS
 
 _LOGGER = logging.getLogger(__name__)
 
 
+def _dev(host: str) -> DeviceInfo:
+    return DeviceInfo(
+        identifiers={(DOMAIN, host)},
+        name=f"Orei BK808 ({host})",
+        manufacturer="Orei",
+        model="BK808",
+        configuration_url=f"https://{host}",
+    )
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
-    """Set up status sensors."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
-
-    entities = [
-        MatrixStatusSensor(coordinator),
-        ActiveInputsSensor(coordinator),
-        ActiveOutputsSensor(coordinator),
+    hostname = str(coordinator.host).replace(".", "_")
+    entities: list = [
+        PowerSensor(coordinator, hostname),
+        FirmwareSensor(coordinator, hostname),
     ]
-
-    for i in range(1, 9):
-        entities.append(OutputRoutingSensor(coordinator, i))
-
+    for o in range(1, NUM_PORTS + 1):
+        entities.append(OutputRoutedInputSensor(coordinator, o, hostname))
     async_add_entities(entities)
 
 
-class MatrixStatusSensor(SensorEntity, CoordinatorEntity):
-    """Main matrix status sensor."""
+class PowerSensor(SensorEntity, CoordinatorEntity):
+    _attr_name = "Power"
+    _attr_icon = "mdi:power"
 
-    _attr_has_entity_name = True
-    _attr_name = "Matrix Status"
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_icon = "mdi:network-check"
-
-    def __init__(self, coordinator):
+    def __init__(self, coordinator, hostname: str):
         super().__init__(coordinator)
-        self._attr_unique_id = f"orei_{coordinator.host}_matrix_status"
-
-    @property
-    def native_value(self):
-        status = self.coordinator.data or {}
-        power = status.get("power", 0)
-        return "Online" if power else "Offline"
+        self._attr_unique_id = f"{hostname}_power"
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.host)},
-            name=f"Orei BK808 ({self.coordinator.host})",
-            manufacturer="Orei",
-            model="BK808",
-            configuration_url=f"https://{self.coordinator.host}",
-        )
-
-
-class ActiveInputsSensor(SensorEntity, CoordinatorEntity):
-    """Active input devices sensor."""
-
-    _attr_has_entity_name = True
-    _attr_name = "Active Inputs"
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_icon = "mdi:input-component"
-
-    def __init__(self, coordinator):
-        super().__init__(coordinator)
-        self._attr_unique_id = f"orei_{coordinator.host}_active_inputs"
+        return _dev(self.coordinator.host)
 
     @property
     def native_value(self) -> str:
-        status = self.coordinator.data or {}
-        allsource = status.get("allsource", [])
-        active_inputs = set()
-
-        for mapping in allsource:
-            if isinstance(mapping, list) and len(mapping) >= 2:
-                input_num = mapping[0]
-                active_inputs.add(self.coordinator.get_input_display_name(input_num))
-
-        return ", ".join(sorted(active_inputs)) if active_inputs else "None"
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.host)},
-            manufacturer="Orei",
-            model="BK808",
-        )
+        state = self.coordinator.get_power()
+        if state is None:
+            return "unknown"
+        return "on" if state else "off"
 
 
-class ActiveOutputsSensor(SensorEntity, CoordinatorEntity):
-    """Active output devices sensor."""
-
-    _attr_has_entity_name = True
-    _attr_name = "Active Outputs"
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_icon = "mdi:television"
-
-    def __init__(self, coordinator):
-        super().__init__(coordinator)
-        self._attr_unique_id = f"orei_{coordinator.host}_active_outputs"
-
-    @property
-    def native_value(self) -> str:
-        status = self.coordinator.data or {}
-        allsource = status.get("allsource", [])
-        active_outputs = set()
-
-        for mapping in allsource:
-            if isinstance(mapping, list) and len(mapping) >= 2:
-                output_num = mapping[1]
-                active_outputs.add(self.coordinator.get_output_display_name(output_num))
-
-        return ", ".join(sorted(active_outputs)) if active_outputs else "None"
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.host)},
-            manufacturer="Orei",
-            model="BK808",
-        )
-
-
-class OutputRoutingSensor(SensorEntity, CoordinatorEntity):
-    """Individual output routing status sensor."""
-
-    _attr_has_entity_name = True
-    _attr_icon = "mdi:swap-horizontal"
+class FirmwareSensor(SensorEntity, CoordinatorEntity):
+    _attr_name = "Firmware"
+    _attr_icon = "mdi:tag-multiple"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
-    def __init__(self, coordinator, output_num: int):
+    def __init__(self, coordinator, hostname: str):
         super().__init__(coordinator)
-        self.output_num = output_num
-        self._attr_name = f"Output {output_num} Source"
-        self._attr_unique_id = f"orei_{coordinator.host}_output_{output_num}_routing_sensor"
-
-    @property
-    def native_value(self) -> str:
-        routing = self.coordinator.get_routing_for_output(self.output_num)
-        if routing:
-            _, input_name = routing
-            return input_name
-        return "None"
+        self._attr_unique_id = f"{hostname}_firmware"
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.host)},
-            name=f"Orei BK808 - Output {self
+        return _dev(self.coordinator.host)
+
+    @property
+    def native_value(self) -> str | None:
+        return self.coordinator._video_state.get("version")
+
+
+class OutputRoutedInputSensor(SensorEntity, CoordinatorEntity):
+    _attr_icon = "mdi:input-hdmi"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator, output_num: int, hostname: str):
+        super().__init__(coordinator)
+        self._out = output_num
+        self._attr_name = f"Output {output_num} Routed Input"
+        self._attr_unique_id = f"{hostname}_output_{output_num}_routed_input"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return _dev(self.coordinator.host)
+
+    @property
+    def native_value(self) -> str | None:
+        inum = self.coordinator.get_routed_input(self._out)
+        if inum is None:
+            return "off"
+        if not (1 <= inum <= NUM_PORTS):
+            return f"source-{inum}"
+        return self.coordinator.input_display_name(inum)

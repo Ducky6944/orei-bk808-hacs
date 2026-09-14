@@ -1,105 +1,284 @@
 # LOVELACE DASHBOARD TEMPLATE
-# Import this via: Settings → Dashboards → + Add Dashboard → Import from File
+# Import via: Settings → Dashboards → + Add Dashboard → Import from File
+#
+# This integration uses `has_entity_name = True`, so every entity ID is
+# the simple, global name set by the integration:
+#
+#   switch.matrix_power
+#   sensor.power / sensor.firmware / sensor.output_<N>_routed_input
+#   select.output_<N>_route
+#   switch.output_<N>_mute
+#   button.input_<N>_<command>
+#   button.output_<N>_<command>
+#
+# Entity IDs are case-insensitive and use underscores (HA slugifies).
+# If you've added naming overrides or HA shows slightly different IDs,
+# adjust the strings below.
 
 title: "Orei BK808 Master Control"
 icon: mdi:matrix
 path: orei-control
 panel: true
+
 cards:
   - type: vertical-stack
     cards:
+      # -------------------------------------------------- row 1: power + status
+      - type: horizontal
+        cards:
+          - type: button
+            entity: switch.matrix_power
+            name: Matrix Power
+            icon: mdi:power
+            show_state: true
+            style:
+              color: brand
+            tap_action:
+              action: toggle
+          - type: entity
+            entity: sensor.power
+            name: Power
+            icon: mdi:power
+          - type: entity
+            entity: sensor.firmware
+            name: Firmware
+            icon: mdi:tag-multiple
+
+      # -------------------------------------------------- row 2: routing matrix
       - type: heading
-        heading: "Input Control"
-        icon: mdi:input-component
-      
-      - type: entities
-        show_header_toggle: false
-        entities:
-          - entity: select.output_1_input
-            name: Theater AVR
-          - entity: select.output_2_input
-            name: Living Room TV
-          - entity: select.output_3_input
-            name: Main Bedroom
-          - entity: select.output_4_input
-            name: Kids Bedroom
-          - entity: select.output_5_input
-            name: Guest Bedroom
-          - entity: select.output_6_input
-            name: Balcony Amp
-          - entity: select.output_7_input
-            name: Output 7
-          - entity: select.output_8_input
-            name: Output 8
-      
+        heading: "Routing"
+        icon: mdi:input-hdmi
+
       - type: grid
         columns: 4
         square: false
         cards:
-          - type: button
-            entity: button.input_1_play
-            name: Input 1 Play
-            icon: mdi:play
-          - type: button
-            entity: button.input_2_play
-            name: Input 2 Play
-            icon: mdi:play
-          - type: button
-            entity: button.input_3_play
-            name: Input 3 Play
-            icon: mdi:play
-          - type: button
-            entity: button.input_4_play
-            name: Input 4 Play
-            icon: mdi:play
-      
+          - type: selector
+            entity: select.output_1_route
+            name: Output 1
+          - type: selector
+            entity: select.output_2_route
+            name: Output 2
+          - type: selector
+            entity: select.output_3_route
+            name: Output 3
+          - type: selector
+            entity: select.output_4_route
+            name: Output 4
+          - type: selector
+            entity: select.output_5_route
+            name: Output 5
+          - type: selector
+            entity: select.output_6_route
+            name: Output 6
+          - type: selector
+            entity: select.output_7_route
+            name: Output 7
+          - type: selector
+            entity: select.output_8_route
+            name: Output 8
+
+      # -------------------------------------------------- row 3: per-output state
       - type: heading
-        heading: "Output Controls"
+        heading: "Outputs"
         icon: mdi:television
-      
-      - type: entities
-        show_header_toggle: false
-        entities:
-          - entity: switch.matrix_power
-            name: Matrix Power
-          - entity: button.output_1_volume_up
-            name: Output 1 Volume Up
-            icon: mdi:volume-plus
-          - entity: button.output_1_mute
-            name: Output 1 Mute
-            icon: mdi:speaker-off
-      
-      - type: heading
-        heading: "Quick Actions"
-        icon: mdi:lightning-bolt
-      
+
       - type: grid
-        columns: 2
+        columns: 4
+        square: false
+        cards:
+          - type: entities
+            title: Output 1
+            entities:
+              - entity: sensor.output_1_routed_input
+              - entity: switch.output_1_mute
+          - type: entities
+            title: Output 2
+            entities:
+              - entity: sensor.output_2_routed_input
+              - entity: switch.output_2_mute
+          - type: entities
+            title: Output 3
+            entities:
+              - entity: sensor.output_3_routed_input
+              - entity: switch.output_3_mute
+          - type: entities
+            title: Output 4
+            entities:
+              - entity: sensor.output_4_routed_input
+              - entity: switch.output_4_mute
+          - type: entities
+            title: Output 5
+            entities:
+              - entity: sensor.output_5_routed_input
+              - entity: switch.output_5_mute
+          - type: entities
+            title: Output 6
+            entities:
+              - entity: sensor.output_6_routed_input
+              - entity: switch.output_6_mute
+          - type: entities
+            title: Output 7
+            entities:
+              - entity: sensor.output_7_routed_input
+              - entity: switch.output_7_mute
+          - type: entities
+            title: Output 8
+            entities:
+              - entity: sensor.output_8_routed_input
+              - entity: switch.output_8_mute
+
+      # -------------------------------------------------- row 4: CEC — Input 1
+      - type: heading
+        heading: "CEC — Input 1"
+        icon: mdi:remote
+
+      - type: grid
+        columns: 6
         square: false
         cards:
           - type: button
-            entity: button.game_mode
-            name: Game Mode
-            icon: mdi:gamepad-variant
+            entity: button.input_1_play
+            name: Play
+            icon: mdi:play
+            style: {color: brand}
           - type: button
-            entity: button.movie_night
-            name: Movie Night
-            icon: mdi:movie
+            entity: button.input_1_pause
+            name: Pause
+            icon: mdi:pause
           - type: button
-            entity: button.security_monitor
-            name: Security Monitor
-            icon: mdi:cctv
+            entity: button.input_1_stop
+            name: Stop
+            icon: mdi:stop
           - type: button
-            entity: button.all_off
-            name: All Off
+            entity: button.input_1_next_track
+            name: Next
+            icon: mdi:skip-next
+          - type: button
+            entity: button.input_1_prev_track
+            name: Prev
+            icon: mdi:skip-previous
+          - type: button
+            entity: button.input_1_fast_forward
+            name: FF
+            icon: mdi:fast-forward
+          - type: button
+            entity: button.input_1_rewind
+            name: RW
+            icon: mdi:rewind
+          - type: button
+            entity: button.input_1_enter
+            name: Enter
+            icon: mdi:check
+          - type: button
+            entity: button.input_1_menu
+            name: Menu
+            icon: mdi:menu
+          - type: button
+            entity: button.input_1_loop
+            name: Loop
+            icon: mdi:loop
+          - type: button
+            entity: button.input_1_up
+            name: Up
+            icon: mdi:arrow-up
+          - type: button
+            entity: button.input_1_down
+            name: Down
+            icon: mdi:arrow-down
+          - type: button
+            entity: button.input_1_left
+            name: Left
+            icon: mdi:arrow-left
+          - type: button
+            entity: button.input_1_right
+            name: Right
+            icon: mdi:arrow-right
+          - type: button
+            entity: button.input_1_power_on
+            name: Power On
+            icon: mdi:power-cycle
+          - type: button
+            entity: button.input_1_power_off
+            name: Power Off
             icon: mdi:power-off
-      
+          - type: button
+            entity: button.input_1_mute
+            name: Mute
+            icon: mdi:speaker-off
+            style: {color: error}
+          - type: button
+            entity: button.input_1_volume_up
+            name: Vol +
+            icon: mdi:volume-plus
+          - type: button
+            entity: button.input_1_volume_down
+            name: Vol −
+            icon: mdi:volume-minus
+
+      # -------------------------------------------------- row 5: CEC — Output 1 (AVR)
       - type: heading
-        heading: "Status"
-        icon: mdi:information
-      
-      - type: entities
-        entities:
-          - entity: sensor.matrix_status
-          - entity: sensor.active_inputs
-          - entity: sensor.active_outputs
+        heading: "CEC — Output 1 (AVR)"
+        icon: mdi:remote
+
+      - type: grid
+        columns: 7
+        square: false
+        cards:
+          - type: button
+            entity: button.output_1_power_on
+            name: Power On
+            icon: mdi:power-cycle
+          - type: button
+            entity: button.output_1_power_off
+            name: Power Off
+            icon: mdi:power-off
+          - type: button
+            entity: button.output_1_mute
+            name: Mute
+            icon: mdi:speaker-off
+            style: {color: error}
+          - type: button
+            entity: button.output_1_volume_up
+            name: Vol +
+            icon: mdi:volume-plus
+          - type: button
+            entity: button.output_1_volume_down
+            name: Vol −
+            icon: mdi:volume-minus
+          - type: button
+            entity: button.output_1_enter
+            name: Enter
+            icon: mdi:check
+          - type: button
+            entity: button.output_1_play
+            name: Play
+            icon: mdi:play
+          - type: button
+            entity: button.output_1_prev_track
+            name: Prev
+            icon: mdi:skip-previous
+          - type: button
+            entity: button.output_1_next_track
+            name: Next
+            icon: mdi:skip-next
+          - type: button
+            entity: button.output_1_left
+            name: Left
+            icon: mdi:arrow-left
+          - type: button
+            entity: button.output_1_right
+            name: Right
+            icon: mdi:arrow-right
+          - type: button
+            entity: button.output_1_down
+            name: Down
+            icon: mdi:arrow-down
+          - type: button
+            entity: button.output_1_menu
+            name: Menu
+            icon: mdi:menu
+          - type: button
+            entity: button.output_1_loop
+            name: Loop
+            icon: mdi:loop

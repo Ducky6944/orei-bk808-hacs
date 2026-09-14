@@ -1,91 +1,124 @@
 """Pytest fixtures for Orei BK808 tests."""
 
 import pytest
-import pytest_homeassistant_custom_component
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
+
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 from homeassistant.config_entries import ConfigEntryState
-import aiohttp
 
 from custom_components.orei_bk808.const import DOMAIN
 from custom_components.orei_bk808.coordinator import OreiCoordinator
 
-@pytest.fixture
-def mock_aioresponse():
-    """Mock aiohttp responses."""
-    with patch("aiohttp.ClientSession.post") as mock_post:
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json = AsyncMock(return_value={
-            "result": {
-                "power": 1,
-                "allsource": [[1, 1], [2, 2]],
-                "allinputname": ["Input 1", "Input 2"],
-                "alloutputname": ["Output 1", "Output 2"],
-                "version": "1.0.5"
-            }
-        })
-        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_response.__aexit__ = AsyncMock(return_value=None)
-        mock_post.return_value = mock_response
-        
-        yield mock_post
-
-@pytest.fixture
-def mock_coordinator(hass: HomeAssistant):
-    """Create a mock coordinator."""
-    coordinator = OreiCoordinator(
-        hass=hass,
-        host="test.local",
-        username="test_user",
-        password="test_pass",
-        input_names=["Test 1", "Test 2"],
-        output_names=["Test Out 1", "Test Out 2"]
-    )
-    return coordinator
-
-@pytest.fixture
-async def initialized_integration(hass: HomeAssistant, mock_aioresponse):
-    """Set up a fully initialized integration."""
-    from homeassistant.config_entries import ConfigEntry
-    
-    config_entry = ConfigEntry(
-        version=1,
-        minor_version=1,
-        domain=DOMAIN,
-        title="test.local",
-        data={
-            "host": "test.local",
-            "username": "test_user",
-            "password": "test_pass",
-            "input_names": ["PS5", "Xbox", "PC", "Appletv", "Shield", "Cameras", "Zone2", "Backup"],
-            "output_names": ["LivingRoom", "Bedroom", "Projector", "Kitchen", "Guest", "Balcony", "Out7", "Out8"]
-        },
-        source="user",
-        entry_id="test_entry_1",
-    )
-    
-    config_entry.add_to_hass(hass)
-    await async_setup_component(hass, DOMAIN, {})
-    await hass.async_block_till_done()
-    
-    assert config_entry.state == ConfigEntryState.LOADED
-    
-    yield config_entry
-    
-    await hass.config_entries.async_remove(config_entry.entry_id)
 
 @pytest.fixture
 def sample_video_status():
-    """Sample video status response."""
+    """Sample `get video status` body (allsource is a flat list, one entry per output)."""
     return {
+        "comhead": "get video status",
         "power": 1,
-        "allsource": [
-            [1, 1], [2, 2], [1, 3], [1, 4],
-            [1, 5], [1, 6], [1, 7], [1, 8]
+        "allsource": [5, 2, 1, 1, 1, 3, 1, 1],
+        "allinputname": [
+            "Unifi Protect", "Playstation 5", "Nintendo Switch", "Xbox Series X",
+            "Gaming PC", "Apple TV", "Nvidia Shield", "Theater Zone 2",
         ],
-        "allinputname": ["Unifi Protect", "PS5", "Nintendo", "Xbox", "PC", "Apple TV", "Shield", "Zone2"],
-        "alloutputname": ["AVR", "LR AVR", "Bedroom", "Kids", "Guest", "Balcony", "Out7", "Out8"],
-        "version": "1.0.5"
+        "alloutputname": [
+            "Theater AVR", "Living Room AVR", "Main Bedroom Projector", "Kids Bedroom TV",
+            "Guest Bedroom TV", "Living Room Balcony Amp", "Output7", "Output8",
+        ],
+        "allname": ["Preset1", "Preset2", "Preset3", "Preset4",
+                    "Preset5", "Preset6", "Preset7", "Preset8"],
+        "version": "V1.10.01",
     }
+
+
+@pytest.fixture
+def sample_cec_status():
+    """Sample `get cec status` body."""
+    return {
+        "comhead": "get cec status",
+        "power": 1,
+        "allinputname": ["In A", "In B", "In C", "In D",
+                         "In E", "In F", "In G", "In H"],
+        "alloutputname": ["Out A", "Out B", "Out C", "Out D",
+                          "Out E", "Out F", "Out G", "Out H"],
+        "inputindex": [1, 0, 0, 0, 0, 0, 0, 0],
+        "outputindex": [1, 0, 0, 0, 0, 0, 0, 0],
+    }
+
+
+@pytest.fixture
+def mock_coordinator(hass: HomeAssistant):
+    """A coordinator not tied to a live device."""
+    return OreiCoordinator(
+        hass=hass,
+        host="test.local",
+        input_names=["Test 1", "Test 2"],
+        output_names=["Test Out 1", "Test Out 2"],
+    )
+
+
+@pytest.fixture
+async def initialized_integration(hass: HomeAssistant, sample_video_status, sample_cec_status):
+    """Set up a fully initialized integration with mocked HTTP."""
+
+    def _get(url, params=None, **kwargs):
+        resp = AsyncMock()
+        resp.status = 200
+        return resp
+
+    async def _get_cm(head):
+        if "video" in head:
+            return sample_video_status
+        return sample_cec_status
+
+    with patch(
+        "custom_components.orei_bk808.coordinator.OreiCoordinator._async_update_data",
+        new=lambda self: _make_update(self, sample_video_status, sample_cec_status),
+    ), patch(
+        "custom_components.orei_bk808.coordinator.OreiCoordinator._query",
+        new=lambda self, comhead: _make_query(self, comhead, sample_video_status, sample_cec_status),
+    ):
+        from homeassistant.config_entries import ConfigEntry
+
+        entry = ConfigEntry(
+            version=1,
+            domain=DOMAIN,
+            title="test.local",
+            data={
+                "host": "test.local",
+                "input_names": ["PS5", "Xbox", "PC", "Apple TV", "Shield", "Cameras", "Zone 2", "Backup"],
+                "output_names": ["Living Room", "Bedroom", "Projector", "Kitchen",
+                                 "Guest", "Balcony", "Out 7", "Out 8"],
+            },
+            source="user",
+            entry_id="test_entry_1",
+        )
+        entry.add_to_hass(hass)
+        await async_setup_component(hass, DOMAIN, {})
+        await hass.async_block_till_done()
+        assert entry.state == ConfigEntryState.LOADED
+        yield entry
+        await hass.config_entries.async_remove(entry.entry_id)
+
+
+def _make_update(self, video, cec):
+    async def _update():
+        self._video_state = video
+        self._cec_state = cec
+        if "allinputname" in video:
+            self._device_inputs = list(video["allinputname"])[:8]
+        if "alloutputname" in video:
+            self._device_outputs = list(video["alloutputname"])[:8]
+        return {"video": video, "cec": cec}
+    return _update()
+
+
+def _make_query(self, comhead, video, cec):
+    async def _query():
+        if "video" in comhead:
+            self._video_state = video
+            return video
+        self._cec_state = cec
+        return cec
+    return _query()
