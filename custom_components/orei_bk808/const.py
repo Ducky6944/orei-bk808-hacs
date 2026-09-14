@@ -7,6 +7,11 @@ CONF_OUTPUT_NAMES = "output_names"
 
 DEFAULT_TIMEOUT = 10
 
+# How long (seconds) to wait after a routing command before confirming
+# against the device. The matrix needs a moment to register a switch before
+# it reflects the change in `allsource`.
+ROUTE_SETTLE_DELAY = 0.6
+
 DEFAULT_INPUT_NAMES = [
     "Input 1", "Input 2", "Input 3", "Input 4",
     "Input 5", "Input 6", "Input 7", "Input 8",
