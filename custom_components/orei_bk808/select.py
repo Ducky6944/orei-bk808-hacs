@@ -35,7 +35,7 @@ class OutputRouteSelect(SelectEntity, CoordinatorEntity):
 
     @property
     def name(self) -> str:
-        return f"Output {self._out} Route"
+        return f"{self.coordinator.output_display_name(self._out)} Route"
 
     @property
     def device_info(self) -> DeviceInfo:

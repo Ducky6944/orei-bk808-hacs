@@ -58,7 +58,7 @@ class InputRemoteSelect(SelectEntity, CoordinatorEntity):
     def __init__(self, coordinator, port_num: int, hostname: str):
         super().__init__(coordinator)
         self._port = port_num
-        self._attr_name = f"Input {port_num} Remote"
+        self._attr_name = f"{coordinator.input_display_name(port_num)} Remote"
         self._attr_unique_id = f"{hostname}_input_{port_num}_remote"
         self._attr_icon = "mdi:remote"
         self._label_to_cmd = {
@@ -110,7 +110,7 @@ class OutputRemoteSelect(SelectEntity, CoordinatorEntity):
     def __init__(self, coordinator, port_num: int, hostname: str):
         super().__init__(coordinator)
         self._out = port_num
-        self._attr_name = f"Output {port_num} Remote"
+        self._attr_name = f"{coordinator.output_display_name(port_num)} Remote"
         self._attr_unique_id = f"{hostname}_output_{port_num}_remote"
         self._attr_icon = "mdi:remote"
         self._label_to_cmd = {

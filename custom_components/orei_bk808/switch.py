@@ -76,7 +76,7 @@ class OutputMute(SwitchEntity, CoordinatorEntity):
 
     @property
     def name(self) -> str:
-        return f"Output {self._out} Mute"
+        return f"{self.coordinator.output_display_name(self._out)} Mute"
 
     @property
     def device_info(self) -> DeviceInfo:
