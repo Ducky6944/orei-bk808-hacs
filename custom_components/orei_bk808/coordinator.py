@@ -1,5 +1,6 @@
 """Data coordinator for the Orei BK808 HDMI Matrix."""
 
+import json
 import logging
 from datetime import timedelta
 from typing import Any, Dict, List, Literal, Optional
@@ -98,10 +99,18 @@ class OreiCoordinator(DataUpdateCoordinator):
         session = await self._get_session()
         timeout = aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT)
         async with session.get(url, params=params, timeout=timeout, ssl=False) as resp:
+            if resp.status != 200:
+                body = await resp.text()
+                raise aiohttp.ClientResponseError(
+                    resp.request_info,
+                    resp.history,
+                    status=resp.status,
+                    message=f"HTTP {resp.status}: {body[:200]}",
+                )
             body = await resp.text()
             try:
-                return await resp.json()
-            except Exception:
+                return json.loads(body)
+            except ValueError:
                 raise aiohttp.ClientResponseError(
                     resp.request_info,
                     resp.history,
@@ -125,8 +134,8 @@ class OreiCoordinator(DataUpdateCoordinator):
                     message=f"HTTP {resp.status}: {body[:200]}",
                 )
             try:
-                return await resp.json()
-            except Exception:
+                return json.loads(body)
+            except ValueError:
                 raise aiohttp.ClientResponseError(
                     resp.request_info,
                     resp.history,
