@@ -110,4 +110,4 @@ CEC_COMMAND_NAMES = sorted(
     set(CEC_INPUT_COMMANDS) | set(CEC_OUTPUT_COMMANDS)
 )
 
-PLATFORMS = ["button", "remote", "select", "sensor", "switch"]
+PLATFORMS = ["button", "media_player", "remote", "select", "sensor", "switch"]
