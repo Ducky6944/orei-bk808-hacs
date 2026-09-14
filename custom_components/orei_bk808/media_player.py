@@ -13,11 +13,7 @@ card per port — HA's native media controls just work.
 
 import logging
 
-from homeassistant.components.media_player import (
-    MediaPlayerEntity,
-    MediaPlayerFeature,
-    MediaPlayerState,
-)
+from homeassistant.components.media_player import MediaPlayerEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -26,6 +22,44 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, NUM_PORTS
 
 _LOGGER = logging.getLogger(__name__)
+
+# --- Feature flags (resilient to HA moving the enum) --------------------------
+# `MediaPlayerFeature` has lived in homeassistant.components.media_player for
+# years, but recent HA builds have relocated it, which previously broke this
+# platform with "cannot import name 'MediaPlayerFeature'". Import from the
+# usual place first, and fall back to a value-compatible IntFlag so the
+# advertised feature mask stays correct on every supported HA version.
+try:
+    from homeassistant.components.media_player import MediaPlayerFeature  # type: ignore
+except ImportError:  # pragma: no cover - version fallback
+    try:
+        from homeassistant.components.media_player.const import (  # type: ignore
+            MediaPlayerFeature,
+        )
+    except ImportError:
+        from enum import IntFlag
+
+        class MediaPlayerFeature(IntFlag):  # type: ignore
+            NONE = 0
+            VOLUME_SET = 1
+            VOLUME_MUTE = 2
+            PLAY_MEDIA = 16
+            PAUSE = 128
+            PLAY = 256
+            STOP = 512
+            NEXT_TRACK = 1024
+            PREVIOUS_TRACK = 2048
+            SHUFFLE = 8192
+            SELECT_SOURCE = 16384
+            VOLUME_STEP = 32768
+            TURN_OFF = 65536
+            TURN_ON = 131072
+
+
+# Media-player states as plain strings (the exact values HA expects) — avoids a
+# hard dependency on the MediaPlayerState enum, which also moved across builds.
+_STATE_IDLE = "idle"
+_STATE_OFF = "off"
 
 
 def _dev(host: str) -> DeviceInfo:
@@ -101,7 +135,7 @@ class _MediaInputPlayer(_BasePlayer):
             self.coordinator.get_routed_input(o) == self._port
             for o in range(1, NUM_PORTS + 1)
         )
-        return MediaPlayerState.IDLE if routed else MediaPlayerState.OFF
+        return _STATE_IDLE if routed else _STATE_OFF
 
     @property
     def is_on(self) -> bool | None:
@@ -168,7 +202,7 @@ class _MediaOutputPlayer(_BasePlayer):
     @property
     def state(self) -> str | None:
         src = self.coordinator.get_routed_input(self._port)
-        return MediaPlayerState.IDLE if src else MediaPlayerState.OFF
+        return _STATE_IDLE if src else _STATE_OFF
 
     @property
     def is_on(self) -> bool | None:
