@@ -4,6 +4,15 @@
       "user": {
         "title": "Orei BK808 Setup",
         "description": "Enter your matrix IP address (e.g. `my-matrix.local` or `10.0.50.81`)."
+      },
+      "naming": {
+        "title": "Connection Successful!",
+        "description": "Device found. The port names below were read from the device. Keep them as-is, or rename any input/output to friendlier labels. Leave a slot blank to fall back to the device's own name.",
+        "data": {
+          "use_device_names": "Use device-reported names (uncheck to enter your own)",
+          "input_names": "Input names (comma-separated, 8 slots)",
+          "output_names": "Output names (comma-separated, 8 slots)"
+        }
       }
     },
     "error": {

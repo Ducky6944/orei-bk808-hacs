@@ -45,9 +45,10 @@ A fully-featured Home Assistant integration for the Orei BK808 8x8 HDMI Matrix S
 |------|-------------|
 | 1. Connection | Enter your matrix's IP address or hostname (no login needed) |
 | 2. Verify | The integration tests the connection automatically and reads the device's port names |
-| 3. Done | Entities appear automatically — start using! |
+| 3. Naming | Port names are pre-filled from the device. Keep them as-is, or rename any input/output to friendly names (e.g. "PS5", "Living Room AVR") |
+| 4. Done | Entities appear automatically with your chosen names — start using! |
 
-**That's it.** No credentials, no YAML, no edits. If the connection test fails, you'll get a clear error and can retry. You can rename inputs/outputs later under the integration's **Options**.
+**That's it.** No credentials, no YAML, no edits. If the connection test fails, you'll get a clear error and can retry. You can rename inputs/outputs later (or switch back to device-reported names) under the integration's **Options**.
 
 ## 🎨 Dashboard
 

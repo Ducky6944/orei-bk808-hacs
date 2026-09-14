@@ -2,6 +2,7 @@
 
 import json
 import logging
+from typing import Any
 
 import aiohttp
 import voluptuous as vol
@@ -12,74 +13,181 @@ from homeassistant.core import callback
 from .const import (
     DOMAIN,
     CONF_HOST,
+    CONF_INPUT_NAMES,
+    CONF_OUTPUT_NAMES,
     DEFAULT_INPUT_NAMES,
     DEFAULT_OUTPUT_NAMES,
     DEFAULT_TIMEOUT,
+    NUM_PORTS,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-_NAME_SCHEMA = vol.Schema(
-    {
-        vol.Optional("input_names", default=",".join(DEFAULT_INPUT_NAMES)): str,
-        vol.Optional("output_names", default=",".join(DEFAULT_OUTPUT_NAMES)): str,
-    }
-)
+
+def _split_names(raw: str) -> list[str]:
+    """Split a comma-separated string into up to 8 non-empty names."""
+    names = [p.strip() for p in raw.split(",") if p.strip()]
+    return names[:NUM_PORTS]
 
 
-def _split_names(raw: str, fallback: list[str]) -> list[str]:
-    names = [p.strip() for p in raw.split(",") if p.strip()][:8]
-    names += fallback[len(names):]
-    return names[:8]
+def _names_to_display(names: Any) -> str:
+    """Render a names field for display (join list, or return string)."""
+    if isinstance(names, (list, tuple)):
+        return ",".join(str(n) for n in names if str(n).strip())
+    return str(names or "")
+
+
+def _pad_names(names: list[str]) -> list[str]:
+    """Pad a names list up to NUM_PORTS with empty strings so index math is safe."""
+    out = [str(n) for n in names][:NUM_PORTS]
+    out += [""] * (NUM_PORTS - len(out))
+    return out
 
 
 async def _validate(host: str) -> dict:
-    """Hit /cgi-bin/query and return the state body (throws on failure)."""
+    """Hit the matrix and return whatever state snapshot comes back.
+
+    The device alternates between `get video status` and `get cec status`
+    responses; either one may carry the `allinputname`/`alloutputname`
+    fields, which is all we need here.
+    """
     timeout = aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT)
     url = f"https://{host}/cgi-bin/query"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(
-            url, params={"comhead": "get cec status"}, timeout=timeout, ssl=False
-        ) as resp:
-            resp.raise_for_status()
-            return json.loads(await resp.text())
+    for comhead in ("get cec status", "get video status"):
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                url, params={"comhead": comhead}, timeout=timeout, ssl=False
+            ) as resp:
+                resp.raise_for_status()
+                body = json.loads(await resp.text())
+                if "allinputname" in body or "alloutputname" in body:
+                    return body
+    return {}
 
 
 class OreiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """User-initiated setup: ask for the host, validate, finish."""
+    """User-initiated setup.
+
+    Step 1 (`user`):  ask for the host.
+    Step 2 (`naming`): show the device-reported port names, pre-filled in
+                       both input and output fields; the user may rename
+                       any of them or leave a slot blank to fall back to
+                       the device name.
+    """
 
     VERSION = 1
 
     async def async_step_user(self, user_input: dict | None = None) -> dict:
         errors: dict[str, str] = {}
+
         if user_input is not None:
-            host = user_input[CONF_HOST].strip().removeprefix("https://").removeprefix("http://")
+            host = (
+                user_input[CONF_HOST]
+                .strip()
+                .removeprefix("https://")
+                .removeprefix("http://")
+            )
+            self._host = host
             try:
                 state = await _validate(host)
             except (aiohttp.ClientError, aiohttp.ServerTimeoutError) as err:
                 _LOGGER.error("Cannot reach %s: %s", host, err)
                 errors["base"] = "cannot_connect"
             except Exception as err:  # noqa: BLE001
-                _LOGGER.error("Unexpected error contacting %s: %s", host, err, exc_info=True)
+                _LOGGER.error(
+                    "Unexpected error contacting %s: %s", host, err, exc_info=True
+                )
                 errors["base"] = "unknown"
             else:
-                self._async_abort_entries_match({CONF_HOST: host})
-                names = {
-                    CONF_HOST: host,
-                    "input_names": DEFAULT_INPUT_NAMES,
-                    "output_names": DEFAULT_OUTPUT_NAMES,
-                }
-                # Store the device-reported names we saw, if any
-                if "allinputname" in state:
-                    names["input_names"] = list(state["allinputname"])[:8]
-                if "alloutputname" in state:
-                    names["output_names"] = list(state["alloutputname"])[:8]
-                return self.async_create_entry(title=host, data=names)
+                # Stash the device-reported names (may be empty) so the
+                # naming step can pre-fill them.
+                self._device_input_names = _pad_names(
+                    list(state.get("allinputname", []))
+                )
+                self._device_output_names = _pad_names(
+                    list(state.get("alloutputname", []))
+                )
+                return await self.async_step_naming()
+
+            # If we got here one of the error branches ran. Re-show the
+            # user form on the next submit.
+            return self.async_show_form(
+                step_id="user",
+                data_schema=vol.Schema({vol.Required(CONF_HOST): str}),
+                errors=errors,
+            )
 
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema({vol.Required(CONF_HOST): str}),
             errors=errors,
+        )
+
+    async def async_step_naming(self, user_input: dict | None = None) -> dict:
+        """Optional rename step. Pre-filled with the device's own port names."""
+        device_in = ",".join(
+            n for n in self._device_input_names if n.strip()
+        )
+        device_out = ",".join(
+            n for n in self._device_output_names if n.strip()
+        )
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_INPUT_NAMES,
+                    default=device_in
+                    if device_in
+                    else ",".join(DEFAULT_INPUT_NAMES),
+                ): str,
+                vol.Optional(
+                    CONF_OUTPUT_NAMES,
+                    default=device_out
+                    if device_out
+                    else ",".join(DEFAULT_OUTPUT_NAMES),
+                ): str,
+                vol.Optional(
+                    "use_device_names",
+                    default=bool(device_in and device_out),
+                ): bool,
+            }
+        )
+
+        if user_input is not None:
+            if user_input.get("use_device_names", True):
+                # Use whatever the device reported (already stored)
+                chosen_in = self._device_input_names
+                chosen_out = self._device_output_names
+            else:
+                chosen_in = _split_names(user_input.get(CONF_INPUT_NAMES, ""))
+                chosen_out = _split_names(user_input.get(CONF_OUTPUT_NAMES, ""))
+
+            # Pad to NUM_PORTS so the coordinator's index math is safe even
+            # if the user left trailing slots blank.
+            chosen_in = _pad_names(chosen_in)
+            chosen_out = _pad_names(chosen_out)
+
+            # Fall back to generic names for any blank slots so the
+            # coordinator never sees an empty string.
+            chosen_in = [n or f"Input {i+1}" for i, n in enumerate(chosen_in)]
+            chosen_out = [n or f"Output {i+1}" for i, n in enumerate(chosen_out)]
+
+            self._async_abort_entries_match({CONF_HOST: self._host})
+            return self.async_create_entry(
+                title=self._host,
+                data={
+                    CONF_HOST: self._host,
+                    CONF_INPUT_NAMES: chosen_in,
+                    CONF_OUTPUT_NAMES: chosen_out,
+                    # Keep the device-reported names around so the user can
+                    # switch back to them later from the options flow.
+                    "device_input_names": list(self._device_input_names),
+                    "device_output_names": list(self._device_output_names),
+                },
+            )
+
+        return self.async_show_form(
+            step_id="naming",
+            data_schema=schema,
         )
 
     @staticmethod
@@ -91,31 +199,48 @@ class OreiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class OreiOptionsFlowHandler(config_entries.OptionsFlow):
-    """Options flow — rename inputs and outputs."""
+    """Options flow — rename inputs and outputs (or revert to device names)."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._config_entry = config_entry
 
     async def async_step_init(self, user_input: dict | None = None) -> dict:
         entry = self._config_entry
-        cur_inputs = entry.data.get("input_names", DEFAULT_INPUT_NAMES)
-        cur_outputs = entry.data.get("output_names", DEFAULT_OUTPUT_NAMES)
-        if isinstance(cur_inputs, list):
-            cur_inputs = ",".join(cur_inputs)
-        if isinstance(cur_outputs, list):
-            cur_outputs = ",".join(cur_outputs)
+        cur_in = _names_to_display(entry.data.get(CONF_INPUT_NAMES))
+        cur_out = _names_to_display(entry.data.get(CONF_OUTPUT_NAMES))
+        dev_in = _names_to_display(entry.data.get("device_input_names"))
+        dev_out = _names_to_display(entry.data.get("device_output_names"))
+
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_INPUT_NAMES, default=cur_in): str,
+                vol.Required(CONF_OUTPUT_NAMES, default=cur_out): str,
+                vol.Optional(
+                    "use_device_names",
+                    default=bool(dev_in and dev_out),
+                ): bool,
+            }
+        )
 
         if user_input is not None:
+            if user_input.get("use_device_names", False) and dev_in and dev_out:
+                chosen_in = _pad_names(
+                    [n for n in (entry.data.get("device_input_names") or []) if n]
+                )
+                chosen_out = _pad_names(
+                    [n for n in (entry.data.get("device_output_names") or []) if n]
+                )
+            else:
+                chosen_in = _split_names(user_input.get(CONF_INPUT_NAMES, ""))
+                chosen_out = _split_names(user_input.get(CONF_OUTPUT_NAMES, ""))
+            chosen_in = [n or f"Input {i+1}" for i, n in enumerate(_pad_names(chosen_in))]
+            chosen_out = [n or f"Output {i+1}" for i, n in enumerate(_pad_names(chosen_out))]
+
             data = dict(entry.data)
-            data["input_names"] = _split_names(
-                user_input.get("input_names", cur_inputs), DEFAULT_INPUT_NAMES
-            )
-            data["output_names"] = _split_names(
-                user_input.get("output_names", cur_outputs), DEFAULT_OUTPUT_NAMES
-            )
+            data[CONF_INPUT_NAMES] = chosen_in
+            data[CONF_OUTPUT_NAMES] = chosen_out
             self.hass.config_entries.async_update_entry(entry, data=data)
             await self.hass.config_entries.async_reload(entry.entry_id)
             return self.async_create_entry(title="", data={})
 
-        schema = _NAME_SCHEMA
         return self.async_show_form(step_id="init", data_schema=schema)
