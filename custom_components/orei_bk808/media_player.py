@@ -23,37 +23,52 @@ from .const import DOMAIN, NUM_PORTS
 
 _LOGGER = logging.getLogger(__name__)
 
-# --- Feature flags (resilient to HA moving the enum) --------------------------
-# `MediaPlayerFeature` has lived in homeassistant.components.media_player for
-# years, but recent HA builds have relocated it, which previously broke this
-# platform with "cannot import name 'MediaPlayerFeature'". Import from the
-# usual place first, and fall back to a value-compatible IntFlag so the
-# advertised feature mask stays correct on every supported HA version.
-try:
-    from homeassistant.components.media_player import MediaPlayerFeature  # type: ignore
-except ImportError:  # pragma: no cover - version fallback
-    try:
-        from homeassistant.components.media_player.const import (  # type: ignore
-            MediaPlayerFeature,
-        )
-    except ImportError:
-        from enum import IntFlag
+# --- Feature flags (resilient to HA moving/renaming the enum) -----------------
+# Current HA exports the flag as `MediaPlayerEntityFeature`, while older builds
+# expose `MediaPlayerFeature`. We try both names in both the package and the
+# `const` submodule, using whichever resolves (that guarantees values that
+# match the running HA). Only if neither exists do we define a local IntFlag
+# using the *current* (2026.x) bit values, so the advertised mask is still
+# correct.
+def _resolve_feature_flag():
+    from homeassistant.components import media_player as _mp
+    from homeassistant.components.media_player import const as _const
+    for module in (_mp, _const):
+        for name in ("MediaPlayerEntityFeature", "MediaPlayerFeature"):
+            flag = getattr(module, name, None)
+            if flag is not None:
+                return flag
+    from enum import IntFlag
 
-        class MediaPlayerFeature(IntFlag):  # type: ignore
-            NONE = 0
-            VOLUME_SET = 1
-            VOLUME_MUTE = 2
-            PLAY_MEDIA = 16
-            PAUSE = 128
-            PLAY = 256
-            STOP = 512
-            NEXT_TRACK = 1024
-            PREVIOUS_TRACK = 2048
-            SHUFFLE = 8192
-            SELECT_SOURCE = 16384
-            VOLUME_STEP = 32768
-            TURN_OFF = 65536
-            TURN_ON = 131072
+    class _Feature(IntFlag):
+        PAUSE = 1
+        SEEK = 2
+        VOLUME_SET = 4
+        VOLUME_MUTE = 8
+        PREVIOUS_TRACK = 16
+        NEXT_TRACK = 32
+        TURN_ON = 128
+        TURN_OFF = 256
+        PLAY_MEDIA = 512
+        VOLUME_STEP = 1024
+        SELECT_SOURCE = 2048
+        STOP = 4096
+        CLEAR_PLAYLIST = 8192
+        PLAY = 16384
+        SHUFFLE_SET = 32768
+        SELECT_SOUND_MODE = 65536
+        BROWSE_MEDIA = 131072
+        REPEAT_SET = 262144
+        GROUPING = 524288
+        MEDIA_ANNOUNCE = 1048576
+        MEDIA_ENQUEUE = 2097152
+        SEARCH_MEDIA = 4194304
+
+    _Feature.NONE = _Feature(0)  # type: ignore[attr-defined]
+    return _Feature
+
+
+MediaPlayerFeature = _resolve_feature_flag()
 
 
 # Media-player states as plain strings (the exact values HA expects) — avoids a
