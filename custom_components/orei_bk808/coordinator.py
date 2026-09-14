@@ -1,5 +1,6 @@
 """Data coordinator for the Orei BK808 HDMI Matrix."""
 
+import asyncio
 import json
 import logging
 from datetime import timedelta
@@ -16,6 +17,7 @@ from .const import (
     DEFAULT_INPUT_NAMES,
     DEFAULT_OUTPUT_NAMES,
     NUM_PORTS,
+    ROUTE_SETTLE_DELAY,
     CEC_INPUT_COMMANDS,
     CEC_OUTPUT_COMMANDS,
 )
@@ -57,6 +59,7 @@ class OreiCoordinator(DataUpdateCoordinator):
         self._device_outputs: List[str] = [""] * NUM_PORTS
         self._video_state: Dict[str, Any] = {}
         self._cec_state: Dict[str, Any] = {}
+        self._last_error: Optional[BaseException] = None
 
         self._session: Optional[aiohttp.ClientSession] = None
 
@@ -161,40 +164,61 @@ class OreiCoordinator(DataUpdateCoordinator):
 
     # ------------------------------------------------------------------ polling
 
-    async def _async_update_data(self) -> Dict[str, Any]:
-        # The device is single-connection and sticky about which state it
-        # reports, so we poll sequentially until each of the two states
-        # (video + cec) is seen at least once.
+    async def _fetch_states(self) -> tuple[bool, bool]:
+        """Hit the device for fresh video + cec state.
+
+        Returns (fresh_video_ok, fresh_cec_ok). On success the last-known
+        state is replaced with the freshly read values, so that reads
+        (e.g. `allsource`) always reflect the current routing instead of a
+        stale snapshot from the first poll.
+        """
         last_error: Optional[BaseException] = None
         attempts = 6  # 2 states x up to 3 retries each
-        got_video = self._video_state
-        got_cec = self._cec_state
+        fresh_video: Optional[Dict[str, Any]] = None
+        fresh_cec: Optional[Dict[str, Any]] = None
 
         for _ in range(attempts):
-            if got_video and got_cec:
+            if fresh_video is not None and fresh_cec is not None:
                 break
-            if not got_video:
-                comhead = "get video status"
-            else:
-                comhead = "get cec status"
+            comhead = (
+                "get video status" if fresh_video is None else "get cec status"
+            )
             try:
                 body = await self._query(comhead)
             except (aiohttp.ClientError, aiohttp.ServerTimeoutError) as err:
                 last_error = err
                 continue
             body = body if isinstance(body, dict) else {}
-            if "allsource" in body:
-                got_video = body
-            if "inputindex" in body or "outputindex" in body:
-                got_cec = body
+            if fresh_video is None and "allsource" in body:
+                fresh_video = body
+            if fresh_cec is None and ("inputindex" in body or "outputindex" in body):
+                fresh_cec = body
 
-        if not got_video and not got_cec:
+        # Only replace cached state with what we actually read this round.
+        if fresh_video is not None:
+            self._video_state = fresh_video
+        if fresh_cec is not None:
+            self._cec_state = fresh_cec
+        self._last_error = last_error
+        return fresh_video is not None, fresh_cec is not None
+
+    async def _async_update_data(self) -> Dict[str, Any]:
+        video_ok, cec_ok = await self._fetch_states()
+
+        # First-ever poll: nothing usable yet is a real outage.
+        if not video_ok and not cec_ok and not self._video_state and not self._cec_state:
             raise UpdateFailed(
-                f"All state queries failed for {self.host}: {last_error!r}"
+                f"All state queries failed for {self.host}: {self._last_error!r}"
             )
-
-        self._video_state = got_video or {}
-        self._cec_state = got_cec or {}
+        # Subsequent polls: keep showing last-known-good state rather than
+        # flapping entities on a transient blip or an odd single-connection
+        # response. The next tick will try again.
+        if not video_ok and not cec_ok:
+            _LOGGER.debug(
+                "Refresh %s failed (%r); keeping last-known state",
+                self.host,
+                self._last_error,
+            )
 
         if "allinputname" in self._video_state:
             self._device_inputs = list(self._video_state["allinputname"])[:NUM_PORTS]
@@ -244,13 +268,33 @@ class OreiCoordinator(DataUpdateCoordinator):
 
     # ------------------------------------------------------------------ actions
 
+    def _apply_route(self, output_num: int, input_num: int) -> None:
+        """Optimistically reflect a route in the local state so entities
+        update immediately, before the device confirms."""
+        src = self._video_state.get("allsource")
+        if not isinstance(src, list):
+            src = [0] * NUM_PORTS
+        while len(src) < NUM_PORTS:
+            src.append(0)
+        src[output_num - 1] = input_num
+        self._video_state["allsource"] = src
+
     async def set_route(self, output_num: int, input_num: int) -> None:
-        """Route input_num to output_num. input_num of 8 = off (per UI convention)."""
+        """Route input_num to output_num. input_num of 0 = off."""
         if not (1 <= output_num <= NUM_PORTS):
             raise ValueError(f"Invalid output {output_num}")
-        if not (1 <= input_num <= NUM_PORTS + 1):
+        if not (0 <= input_num <= NUM_PORTS):
             raise ValueError(f"Invalid input {input_num}")
         await self.send_command("video switch", source=[output_num, input_num])
+
+        # Make the UI reflect the new route right away (the device is the
+        # source of truth, but it lags a beat in reporting the change).
+        self._apply_route(output_num, input_num)
+        self.async_update_listeners()
+
+        # Give the matrix a moment to register the switch, then confirm
+        # against the real state so any discrepancy self-corrects.
+        await asyncio.sleep(ROUTE_SETTLE_DELAY)
         await self.async_request_refresh()
 
     async def set_power(self, on: bool) -> None:
