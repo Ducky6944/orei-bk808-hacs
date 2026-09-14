@@ -59,6 +59,10 @@ class OreiCoordinator(DataUpdateCoordinator):
         self._device_outputs: List[str] = [""] * NUM_PORTS
         self._video_state: Dict[str, Any] = {}
         self._cec_state: Dict[str, Any] = {}
+        # Per-port live status: input source power (`inactive`: 1=on) and
+        # output sink connection (`allconnect`: 1=on). Backs media_player state.
+        self._input_active: List[bool] = [False] * NUM_PORTS
+        self._output_connect: List[bool] = [False] * NUM_PORTS
         self._last_error: Optional[BaseException] = None
 
         self._session: Optional[aiohttp.ClientSession] = None
@@ -209,8 +213,37 @@ class OreiCoordinator(DataUpdateCoordinator):
         self._last_error = last_error
         return fresh_video is not None
 
+    async def _fetch_port_status(self) -> None:
+        """Read per-port live status (input power + output sink connection).
+
+        These arrive as `get input status` / `get output status` POST bodies
+        and are separate from the sticky routing blob. A single transient
+        failure here must NOT fail the whole refresh — the state is just
+        stale until the next poll (same leniency as the CEC payload capture).
+        """
+        # input  -> `inactive`: 1 = source powered/on, 0 = off
+        try:
+            body = await self.send_command("get input status")
+            if isinstance(body, dict) and "inactive" in body:
+                vals = list(body["inactive"])[:NUM_PORTS]
+                vals += [0] * (NUM_PORTS - len(vals))
+                self._input_active = [bool(v) for v in vals]
+        except (aiohttp.ClientError, aiohttp.ServerTimeoutError) as err:
+            _LOGGER.debug("get input status failed (%r); keeping last-known", err)
+
+        # output -> `allconnect`: 1 = sink connected/on, 0 = off
+        try:
+            body = await self.send_command("get output status")
+            if isinstance(body, dict) and "allconnect" in body:
+                vals = list(body["allconnect"])[:NUM_PORTS]
+                vals += [0] * (NUM_PORTS - len(vals))
+                self._output_connect = [bool(v) for v in vals]
+        except (aiohttp.ClientError, aiohttp.ServerTimeoutError) as err:
+            _LOGGER.debug("get output status failed (%r); keeping last-known", err)
+
     async def _async_update_data(self) -> Dict[str, Any]:
         video_ok = await self._fetch_states()
+        await self._fetch_port_status()
 
         # First-ever poll with no usable state is a real outage.
         if not video_ok and not self._video_state and not self._cec_state:
@@ -254,6 +287,18 @@ class OreiCoordinator(DataUpdateCoordinator):
         if "power" in self._cec_state:
             return bool(self._cec_state["power"])
         return None
+
+    def input_is_on(self, input_num: int) -> bool:
+        """True if the *source* on this input is powered/on (`inactive`=1)."""
+        if 1 <= input_num <= NUM_PORTS:
+            return bool(self._input_active[input_num - 1])
+        return False
+
+    def output_is_on(self, output_num: int) -> bool:
+        """True if the *sink* on this output is connected/on (`allconnect`=1)."""
+        if 1 <= output_num <= NUM_PORTS:
+            return bool(self._output_connect[output_num - 1])
+        return False
 
     def get_routed_input(self, output_num: int) -> Optional[int]:
         """Return the 1-indexed input routed to this output (or None/off)."""
