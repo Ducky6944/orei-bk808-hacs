@@ -1,6 +1,8 @@
 """Core setup for the Orei BK808 HDMI Matrix integration."""
 
+import asyncio
 import logging
+from typing import Optional
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -37,6 +39,37 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
 
+async def async_initial_refresh(
+    coordinator: "OreiCoordinator",
+    tries: int = 5,
+    delay: float = 1.5,
+) -> None:
+    """First refresh with backoff.
+
+    The BK808 has a sticky single connection; the *first* few requests after
+    a cold boot can return a non-routing blob (or race the poller and return
+    an empty body). A one-shot refresh therefore fails intermittently and
+    logs "All state queries failed ... None". Retry a few times so a flaky
+    cold start doesn't wedge the whole entry.
+    """
+    last: Optional[Exception] = None
+    for i in range(tries):
+        try:
+            await coordinator.async_config_entry_first_refresh()
+            return
+        except ConfigEntryNotReady:
+            raise
+        except Exception as err:  # noqa: BLE001
+            last = err
+            _LOGGER.debug(
+                "Initial refresh attempt %d/%d for %s failed: %s",
+                i + 1, tries, coordinator.host, err,
+            )
+            if i < tries - 1:
+                await asyncio.sleep(delay)
+    raise last
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Create the coordinator, register services, forward to platforms."""
     host = str(entry.data[CONF_HOST])
@@ -51,7 +84,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     try:
-        await coordinator.async_config_entry_first_refresh()
+        await async_initial_refresh(coordinator)
     except Exception as err:
         _LOGGER.error("Initial refresh failed for %s: %s", host, err)
         await coordinator.shutdown()

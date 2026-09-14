@@ -57,8 +57,7 @@ set_preset_name:
     name:
       required: true
       selector:
-        text:
-          type: sentence
+        text: {}
 
 cec_command:
   fields:
@@ -84,6 +83,7 @@ cec_command:
             - enter
             - left
             - right
+            - up
             - down
             - menu
             - play

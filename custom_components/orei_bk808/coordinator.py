@@ -164,34 +164,41 @@ class OreiCoordinator(DataUpdateCoordinator):
 
     # ------------------------------------------------------------------ polling
 
-    async def _fetch_states(self) -> tuple[bool, bool]:
-        """Hit the device for fresh video + cec state.
+    async def _fetch_states(self) -> bool:
+        """Hit the device for fresh routing state.
 
-        Returns (fresh_video_ok, fresh_cec_ok). On success the last-known
-        state is replaced with the freshly read values, so that reads
-        (e.g. `allsource`) always reflect the current routing instead of a
-        stale snapshot from the first poll.
+        The only thing we actually *consume* from the device is the routing
+        blob (`allsource`, plus the port names and power it carries). The
+        device is single-connection and sticky: it latches the payload it
+        returns regardless of which `comhead` we ask for, and that payload
+        sometimes is the video/preset blob and sometimes an `input status`
+        blob. So we poll until we capture a body that carries `allsource`,
+        treating that as success.
+
+        Returns True if a usable routing blob was read this round.
         """
         last_error: Optional[BaseException] = None
-        attempts = 6  # 2 states x up to 3 retries each
+        attempts = 6  # up to 6 tries until the routing blob shows up
         fresh_video: Optional[Dict[str, Any]] = None
         fresh_cec: Optional[Dict[str, Any]] = None
 
         for _ in range(attempts):
-            if fresh_video is not None and fresh_cec is not None:
+            if fresh_video is not None:
                 break
-            comhead = (
-                "get video status" if fresh_video is None else "get cec status"
-            )
             try:
-                body = await self._query(comhead)
+                body = await self._query("get video status")
             except (aiohttp.ClientError, aiohttp.ServerTimeoutError) as err:
                 last_error = err
                 continue
             body = body if isinstance(body, dict) else {}
-            if fresh_video is None and "allsource" in body:
+            if "allsource" in body:
                 fresh_video = body
-            if fresh_cec is None and ("inputindex" in body or "outputindex" in body):
+            # Capture cec-style payload opportunistically (secondary power
+            # fallback only — never required for success).
+            if (
+                fresh_cec is None
+                and ("inputindex" in body or "outputindex" in body)
+            ):
                 fresh_cec = body
 
         # Only replace cached state with what we actually read this round.
@@ -200,20 +207,19 @@ class OreiCoordinator(DataUpdateCoordinator):
         if fresh_cec is not None:
             self._cec_state = fresh_cec
         self._last_error = last_error
-        return fresh_video is not None, fresh_cec is not None
+        return fresh_video is not None
 
     async def _async_update_data(self) -> Dict[str, Any]:
-        video_ok, cec_ok = await self._fetch_states()
+        video_ok = await self._fetch_states()
 
-        # First-ever poll: nothing usable yet is a real outage.
-        if not video_ok and not cec_ok and not self._video_state and not self._cec_state:
+        # First-ever poll with no usable state is a real outage.
+        if not video_ok and not self._video_state and not self._cec_state:
             raise UpdateFailed(
                 f"All state queries failed for {self.host}: {self._last_error!r}"
             )
-        # Subsequent polls: keep showing last-known-good state rather than
-        # flapping entities on a transient blip or an odd single-connection
-        # response. The next tick will try again.
-        if not video_ok and not cec_ok:
+        # Subsequent polls: keep last-known-good rather than flapping entities
+        # on a transient blip or an odd single-connection response.
+        if not video_ok:
             _LOGGER.debug(
                 "Refresh %s failed (%r); keeping last-known state",
                 self.host,
