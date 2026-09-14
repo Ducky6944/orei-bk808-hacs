@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="custom_components/orei_bk808/brand/icon.png" alt="Orei BK808" width="128" height="128"/>
+</p>
+
 # 🔌 Orei BK808 HDMI Matrix Controller for Home Assistant
 
 [![HACS Badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
