@@ -1,9 +1,10 @@
-"""Constants for Orei BK808 integration."""
+"""Constants for Orei BK808 HDMI Matrix."""
 
 DOMAIN = "orei_bk808"
 CONF_HOST = "host"
 CONF_INPUT_NAMES = "input_names"
 CONF_OUTPUT_NAMES = "output_names"
+
 DEFAULT_TIMEOUT = 10
 
 DEFAULT_INPUT_NAMES = [
@@ -16,97 +17,92 @@ DEFAULT_OUTPUT_NAMES = [
     "Output 5", "Output 6", "Output 7", "Output 8",
 ]
 
-SERVICE_ROUTE = "route"
-SERVICE_SAVE_PRESET = "save_preset"
-SERVICE_RECALL_PRESET = "recall_preset"
-SERVICE_GET_STATUS = "get_status"
-SERVICE_CEC_COMMAND = "cec_command"
+NUM_PORTS = 8
 
-ATTR_INPUT = "input"
-ATTR_OUTPUT = "output"
-ATTR_PRESET = "preset"
-ATTR_INDEX = "index"
-ATTR_OBJECT = "object"
+# --- Command names (comhead values) ---
+CM_QUERY_VIDEO = "get video status"
+CM_QUERY_CEC = "get cec status"
+CM_ROUTE = "video switch"
+CM_POWER = "set poweronoff"
+CM_MUTE = "set output audio mute"
+CM_CEC_INDEX = "set cec index"
+CM_CEC_CMD = "cec command"
+CM_PRESET_SET = "preset set"
+CM_PRESET_SAVE = "preset save"
+CM_PRESET_CLEAR = "preset clear"
+CM_PRESET_NAME = "preset name"
 
-CEC_OPCODES = {
-    "standby": 36,
-    "play": 44,
-    "pause": 11,
-    "stop": 17,
-    "fast_forward": 16,
-    "fast_reverse": 15,
-    "next_track": 12,
-    "prev_track": 13,
-    "record_on": 27,
-    "select": 8,
-    "back": 9,
-    "up": 4,
-    "down": 5,
-    "left": 6,
-    "right": 7,
-    "menu_request": 106,
-    "contents_menu": 108,
-    "power_on": 124,
-    "image_view_on": 4,
-    "volume_up": 41,
-    "volume_down": 42,
-    "volume_mute": 43,
-    "mute_audio": 19,
-    "unmute_audio": 18,
+# --- CEC command indices (device-specific) ---
+#
+# These are the raw index values that `cec command` accepts.
+# Extracted from the matrix's own web UI (CEC.vue). The index space
+# differs for inputs (object=0) and outputs (object=1).
+#
+# INPUT side (object=0):
+#   1=power-toggle, 2=power-off, 3=power/pause, 4=left, 5=enter,
+#   6=right, 7=menu/up, 8=down, 9=loop, 10=prev-track, 11=play,
+#   12=next-track, 13=rewind, 14=pause, 15=ffwd, 16=stop,
+#   17=mute, 18=volume-down, 19=volume-up
+#
+# OUTPUT side (object=1):
+#   0=power-on, 1=power-off, 2=mute, 3=volume-down, 4=volume-up,
+#   5=enter, 7=left, 8=enter, 9=right, 10=down, 11=menu,
+#   12=loop, 13=play, 15=prev, 16=next
+#
+# We expose a single friendly set; the coordinator maps each name
+# to the correct index for the target object side.
+
+CEC_INPUT_COMMANDS = {
+    # index matches the matrix web UI (CEC.vue inputData) icon-for-icon:
+    # 1=power(green) 2=power(red) 3=caret-top(up) 4=caret-left 5=enter
+    # 6=caret-right 7=menu 8=caret-bottom(down) 9=loop 10=previous
+    # 11=play 12=next 13=rewind 14=pause 15=ffwd 16=stop 17=mute
+    # 18=vol-down 19=vol-up
+    "power_on":        (1,  "mdi:power-cycle",        "Power On"),
+    "power_off":       (2,  "mdi:power-off",          "Power Off"),
+    "up":              (3,  "mdi:arrow-up",           "Up"),
+    "left":            (4,  "mdi:arrow-left",         "Left"),
+    "enter":           (5,  "mdi:check",              "Enter"),
+    "right":           (6,  "mdi:arrow-right",        "Right"),
+    "menu":            (7,  "mdi:menu",               "Menu"),
+    "down":            (8,  "mdi:arrow-down",         "Down"),
+    "loop":            (9,  "mdi:loop",               "Loop"),
+    "prev_track":      (10, "mdi:skip-previous",      "Previous"),
+    "play":            (11, "mdi:play",               "Play"),
+    "next_track":      (12, "mdi:skip-next",          "Next"),
+    "rewind":          (13, "mdi:rewind",             "Rewind"),
+    "pause":           (14, "mdi:pause",              "Pause"),
+    "fast_forward":    (15, "mdi:fast-forward",       "Fast Forward"),
+    "stop":            (16, "mdi:stop",               "Stop"),
+    "mute":            (17, "mdi:speaker-off",        "Mute"),
+    "volume_down":     (18, "mdi:volume-minus",       "Volume Down"),
+    "volume_up":       (19, "mdi:volume-plus",        "Volume Up"),
 }
 
-INPUT_CEC_GROUPS = {
-    "basic_navigation": [
-        ("select", "mdi:check"),
-        ("back", "mdi:arrow-back"),
-        ("up", "mdi:arrow-up"),
-        ("down", "mdi:arrow-down"),
-        ("left", "mdi:arrow-left"),
-        ("right", "mdi:arrow-right"),
-    ],
-    "transport": [
-        ("play", "mdi:play"),
-        ("pause", "mdi:pause"),
-        ("stop", "mdi:stop"),
-        ("fast_forward", "mdi:fast-forward"),
-        ("fast_reverse", "mdi:rewind"),
-        ("next_track", "mdi:skip-next"),
-        ("prev_track", "mdi:skip-previous"),
-    ],
-    "media": [
-        ("record_on", "mdi:record-rec"),
-        ("contents_menu", "mdi:netflix"),
-        ("menu_request", "mdi:menu"),
-    ],
-    "power": [
-        ("standby", "mdi:power-off"),
-        ("image_view_on", "mdi:television"),
-    ],
+CEC_OUTPUT_COMMANDS = {
+    # index matches the matrix web UI (CEC.vue outputData) icon-for-icon:
+    # 0=power-on(green) 1=power-off(red) 2=mute 3=vol-down 4=vol-up
+    # 5=enter 7=caret-left 8=enter 9=caret-right 10=down 11=menu
+    # 12=loop 13=play 15=prev 16=next
+    "power_on":        (0,  "mdi:power-cycle",        "Power On"),
+    "power_off":       (1,  "mdi:power-off",          "Power Off"),
+    "mute":            (2,  "mdi:speaker-off",        "Mute"),
+    "volume_down":     (3,  "mdi:volume-minus",       "Volume Down"),
+    "volume_up":       (4,  "mdi:volume-plus",        "Volume Up"),
+    "enter":           (5,  "mdi:check",              "Enter"),
+    "left":            (7,  "mdi:arrow-left",         "Left"),
+    "right":           (9,  "mdi:arrow-right",        "Right"),
+    "down":            (10, "mdi:arrow-down",         "Down"),
+    "menu":            (11, "mdi:menu",               "Menu"),
+    "loop":            (12, "mdi:loop",               "Loop"),
+    "play":            (13, "mdi:play",               "Play"),
+    "prev_track":      (15, "mdi:skip-previous",      "Previous"),
+    "next_track":      (16, "mdi:skip-next",          "Next"),
 }
 
-OUTPUT_CEC_GROUPS = {
-    "power": [
-        ("power_on", "mdi:power-on"),
-        ("standby", "mdi:power-off"),
-        ("image_view_on", "mdi:eye"),
-    ],
-    "volume": [
-        ("volume_up", "mdi:volume-plus"),
-        ("volume_down", "mdi:volume-minus"),
-        ("volume_mute", "mdi:speaker-off"),
-    ],
-}
+# Friendly names for services
+CEC_COMMAND_NAMES = sorted(
+    set(CEC_INPUT_COMMANDS) | set(CEC_OUTPUT_COMMANDS)
+)
 
-QUICK_ACTIONS = {
-    "game_mode": [
-        ("power_on", "All outputs"),
-    ],
-    "movie_night": [
-        ("power_on", "All outputs"),
-    ],
-    "all_off": [
-        ("standby", "All outputs"),
-    ],
-}
-
-PLATFORMS = ["switch", "select", "button", "sensor"]
+PLATFORMS = ["button", "select", "sensor", "switch"]

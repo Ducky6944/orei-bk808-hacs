@@ -1,4 +1,3 @@
----
 route:
   fields:
     input:
@@ -36,9 +35,34 @@ recall_preset:
           max: 8
           mode: box
 
+clear_preset:
+  fields:
+    preset:
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 8
+          mode: box
+
+set_preset_name:
+  fields:
+    preset:
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 8
+          mode: box
+    name:
+      required: true
+      selector:
+        text:
+          type: sentence
+
 cec_command:
   fields:
-    target:
+    side:
       required: true
       selector:
         select:
@@ -57,14 +81,47 @@ cec_command:
       selector:
         select:
           options:
+            - enter
+            - left
+            - right
+            - down
+            - menu
             - play
             - pause
             - stop
-            - standby
+            - prev_track
+            - next_track
+            - rewind
+            - fast_forward
+            - loop
             - power_on
+            - power_off
+            - mute
             - volume_up
             - volume_down
-            - volume_mute
 
-get_status:
+set_power:
+  fields:
+    on:
+      required: false
+      default: true
+      selector:
+        boolean: {}
+
+set_mute:
+  fields:
+    output:
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 8
+          mode: box
+    muted:
+      required: false
+      default: true
+      selector:
+        boolean: {}
+
+refresh:
   fields: {}

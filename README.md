@@ -7,12 +7,11 @@ A fully-featured Home Assistant integration for the Orei BK808 8x8 HDMI Matrix S
 
 ## ✨ Features
 
-- 🚀 **4-step GUI setup wizard** with automatic connection testing
-- 🎮 **Full CEC control** for all inputs and outputs
+- 🚀 **GUI setup wizard** with automatic connection testing (no login needed)
+- 🎮 **Full CEC control** for all inputs and outputs (device-mapped command indices)
 - 🔄 **8×8 routing matrix** — route any input to any output
-- ⚡ **Preset save/recall** for instant scene switching
-- 🏷️ **Custom input/output names** set during setup
-- 🔐 **Encrypted credential storage** — nothing hardcoded
+- ⚡ **Preset save/recall/rename** for instant scene switching
+- 🏷️ **Custom input/output names** (auto-detected from the device, editable in options)
 - 🧪 **Automated test suite** with CI
 
 ## 🎯 Supported Devices
@@ -25,7 +24,6 @@ A fully-featured Home Assistant integration for the Orei BK808 8x8 HDMI Matrix S
 - Home Assistant 2024.1 or later
 - HACS installed (recommended)
 - Your Orei BK808 connected to your network via Ethernet
-- Your matrix login credentials (change the defaults first!)
 
 ## 🚀 Installation
 
@@ -45,12 +43,11 @@ A fully-featured Home Assistant integration for the Orei BK808 8x8 HDMI Matrix S
 
 | Step | What You Do |
 |------|-------------|
-| 1. Connection | Enter your matrix's IP address, username, and password |
-| 2. Verify | The integration tests the connection automatically |
-| 3. Naming | Optionally rename inputs/outputs (comma-separated) |
-| 4. Done | Entities appear automatically — start using! |
+| 1. Connection | Enter your matrix's IP address or hostname (no login needed) |
+| 2. Verify | The integration tests the connection automatically and reads the device's port names |
+| 3. Done | Entities appear automatically — start using! |
 
-**That's it.** No configuration files, no YAML, no edits. If the connection test fails, you'll get a clear error and can fix your credentials right in the wizard.
+**That's it.** No credentials, no YAML, no edits. If the connection test fails, you'll get a clear error and can retry. You can rename inputs/outputs later under the integration's **Options**.
 
 ## 🎨 Dashboard
 
@@ -61,37 +58,42 @@ Pick from routing selectors, CEC buttons, power switches, and status sensors —
 
 ## 🎮 CEC Commands Available
 
-Per input device: play, pause, stop, fast forward, rewind, navigation (up/down/left/right), select, back, standby, power on, menu, and more.
+Per input device (source): power on/off, transport (play/pause/stop/next/previous/fast-forward/rewind), loop, navigation (up/down/left/right), enter, menu, mute, and volume up/down.
 
-Per output/display: power on, standby, volume up/down, mute.
+Per output/display (sink): power on/off, enter, play, next/previous, loop, navigation (left/right/down), menu, mute, and volume up/down.
+
+Command indices are the device-specific values extracted from the BK808's own web UI, so each button sends exactly the CEC frame the manufacturer's UI sends.
 
 ## 🔧 Services
 
 | Service | Description |
 |---------|-------------|
-| `orei_bk808.route` | Route an input to an output |
+| `orei_bk808.route` | Route an input (1-8) to an output (1-8) |
 | `orei_bk808.save_preset` | Save current routing to a slot (1-8) |
 | `orei_bk808.recall_preset` | Recall a saved preset |
-| `orei_bk808.cec_command` | Send a CEC command to a port |
-| `orei_bk808.get_status` | Refresh matrix status |
+| `orei_bk808.clear_preset` | Clear a preset slot |
+| `orei_bk808.set_preset_name` | Rename a preset slot |
+| `orei_bk808.cec_command` | Send a CEC command to an input or output port |
+| `orei_bk808.set_power` | Matrix power on/off |
+| `orei_bk808.set_mute` | Mute/unmute an output's audio |
+| `orei_bk808.refresh` | Force a status refresh |
 
 All services are callable from the UI (Developer Tools → Actions) as well as automations and scripts.
 
 ## 🔐 Security
 
-- Credentials are entered in the setup wizard and stored encrypted in Home Assistant's config entry storage — never in files you edit
-- All traffic uses HTTPS to your local device
-- We strongly recommend changing the matrix's default password before installation, and placing AV equipment on an isolated VLAN if possible
+- The matrix's open JSON API needs no login by default; only the host is stored in Home Assistant's config entry
+- The device uses a self-signed TLS certificate, so HA connects with verification disabled (typical for local AV gear)
+- We recommend placing AV equipment on an isolated VLAN, and enabling the web login / changing the default password on the matrix if you expose it beyond your LAN
 
 ## 🐛 Troubleshooting
 
 ### Connection failed during setup?
 
-Verify your credentials work in a browser by visiting your matrix's web interface directly. Common causes:
+Verify the matrix is reachable by opening its web UI in a browser (e.g. `https://hdmi.local.example.com`). Common causes:
 
-- Wrong IP address
+- Wrong IP address or hostname
 - Firewall blocking HTTPS (port 443)
-- Password changed but old credentials entered
 - Matrix powered off
 
 ### CEC commands not working?
