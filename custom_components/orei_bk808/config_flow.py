@@ -1,5 +1,6 @@
 """Config flow for the Orei BK808 HDMI Matrix."""
 
+import json
 import logging
 
 import aiohttp
@@ -41,7 +42,7 @@ async def _validate(host: str) -> dict:
             url, params={"comhead": "get cec status"}, timeout=timeout, ssl=False
         ) as resp:
             resp.raise_for_status()
-            return await resp.json()
+            return json.loads(await resp.text())
 
 
 class OreiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
