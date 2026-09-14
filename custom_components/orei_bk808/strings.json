@@ -16,6 +16,7 @@
         "title": "Connection Successful!",
         "description": "Device found. Customize input/output names (optional).",
         "data": {
+          "use_device_names": "Use device-reported names",
           "input_names": "Input names (comma-separated)",
           "output_names": "Output names (comma-separated)"
         }
