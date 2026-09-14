@@ -96,29 +96,30 @@ class OreiCoordinator(DataUpdateCoordinator):
     # ------------------------------------------------------------------ HTTP
 
     async def _http_get(self, url: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """HTTP GET. State reads MUST return JSON, so an empty/non-JSON
+        body here is a real failure and should be re-pollable."""
         session = await self._get_session()
         timeout = aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT)
         async with session.get(url, params=params, timeout=timeout, ssl=False) as resp:
-            if resp.status != 200:
-                body = await resp.text()
-                raise aiohttp.ClientResponseError(
-                    resp.request_info,
-                    resp.history,
-                    status=resp.status,
-                    message=f"HTTP {resp.status}: {body[:200]}",
-                )
             body = await resp.text()
+            if resp.status != 200:
+                raise aiohttp.ClientResponseError(
+                    resp.request_info, resp.history,
+                    status=resp.status, message=f"HTTP {resp.status}: {body[:200]}",
+                )
             try:
                 return json.loads(body)
             except ValueError:
                 raise aiohttp.ClientResponseError(
-                    resp.request_info,
-                    resp.history,
+                    resp.request_info, resp.history,
                     status=resp.status,
-                    message=f"Non-JSON response: {body[:200]}",
+                    message=f"Non-JSON response: {body[:200]!r}",
                 )
 
     async def _http_post(self, url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """HTTP POST (command). The device sometimes returns an empty body
+        on 200 when a request races its own state poller — we treat that as
+        success since the command was accepted (HTTP 200)."""
         session = await self._get_session()
         timeout = aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT)
         headers = {"Accept": "application/json", "Content-Type": "application/json"}
@@ -128,20 +129,19 @@ class OreiCoordinator(DataUpdateCoordinator):
             body = await resp.text()
             if resp.status != 200:
                 raise aiohttp.ClientResponseError(
-                    resp.request_info,
-                    resp.history,
-                    status=resp.status,
-                    message=f"HTTP {resp.status}: {body[:200]}",
+                    resp.request_info, resp.history,
+                    status=resp.status, message=f"HTTP {resp.status}: {body[:200]}",
                 )
-            try:
-                return json.loads(body)
-            except ValueError:
-                raise aiohttp.ClientResponseError(
-                    resp.request_info,
-                    resp.history,
-                    status=resp.status,
-                    message=f"Non-JSON response: {body[:200]}",
-                )
+            if body and body != "\n":
+                try:
+                    return json.loads(body)
+                except ValueError:
+                    _LOGGER.warning(
+                        "Command received non-JSON body: %r", body[:200]
+                    )
+            else:
+                _LOGGER.debug("Command accepted (200, empty body)")
+            return {}
 
     async def send_command(self, comhead: str, **fields: Any) -> Dict[str, Any]:
         """POST a command to /cgi-bin/instr and return the response body."""
