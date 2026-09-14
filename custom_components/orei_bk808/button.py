@@ -66,9 +66,14 @@ class CecButton(ButtonEntity, CoordinatorEntity):
         self._side = side
         self._port = port_num
         self._cmd = cmd
-        # Deterministic name derived from the command key so the generated
-        # entity id is stable (e.g. button.input_1_prev_track).
-        self._attr_name = f"{side.title()} {port_num} {cmd}"
+        # Display-name prefix resolves user-configured port names (e.g. "PS5
+        # Loop") and falls back to "Input N"/"Output N". The command key keeps
+        # the generated entity id stable (e.g. button.input_1_prev_track).
+        if side == "input":
+            prefix = coordinator.input_display_name(port_num)
+        else:
+            prefix = coordinator.output_display_name(port_num)
+        self._attr_name = f"{prefix} {cmd}"
         self._attr_icon = icon
         self._attr_unique_id = f"{hostname}_{side}_{port_num}_{cmd}"
 

@@ -81,7 +81,7 @@ class OutputRoutedInputSensor(SensorEntity, CoordinatorEntity):
     def __init__(self, coordinator, output_num: int, hostname: str):
         super().__init__(coordinator)
         self._out = output_num
-        self._attr_name = f"Output {output_num} Routed Input"
+        self._attr_name = f"{coordinator.output_display_name(output_num)} Routed Input"
         self._attr_unique_id = f"{hostname}_output_{output_num}_routed_input"
 
     @property
