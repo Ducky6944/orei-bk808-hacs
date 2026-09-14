@@ -95,28 +95,20 @@ cards:
         cards:
           - type: media-control
             entity: media_player.output_1
-            name: Output 1
           - type: media-control
             entity: media_player.output_2
-            name: Output 2
           - type: media-control
             entity: media_player.output_3
-            name: Output 3
           - type: media-control
             entity: media_player.output_4
-            name: Output 4
           - type: media-control
             entity: media_player.output_5
-            name: Output 5
           - type: media-control
             entity: media_player.output_6
-            name: Output 6
           - type: media-control
             entity: media_player.output_7
-            name: Output 7
           - type: media-control
             entity: media_player.output_8
-            name: Output 8
 
       - type: heading
         heading: "Sources (inputs)"
@@ -128,28 +120,20 @@ cards:
         cards:
           - type: media-control
             entity: media_player.input_1
-            name: Input 1
           - type: media-control
             entity: media_player.input_2
-            name: Input 2
           - type: media-control
             entity: media_player.input_3
-            name: Input 3
           - type: media-control
             entity: media_player.input_4
-            name: Input 4
           - type: media-control
             entity: media_player.input_5
-            name: Input 5
           - type: media-control
             entity: media_player.input_6
-            name: Input 6
           - type: media-control
             entity: media_player.input_7
-            name: Input 7
           - type: media-control
             entity: media_player.input_8
-            name: Input 8
 
       # -------------------------------------------------- row 3: all-in-one remotes
       - type: heading

@@ -93,6 +93,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
     _register_services(hass)
+    _register_http_view(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
@@ -115,6 +116,29 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload (called by the options flow)."""
     await async_unload_entry(hass, entry)
     await async_setup_entry(hass, entry)
+
+
+def _register_http_view(hass: HomeAssistant) -> None:
+    """Expose the bundled cover image at /local/orei_bk808/cover.jpg.
+
+    Idempotent — guarded so multiple entries / re-adds don't re-register the
+    route (which aiohttp would reject). The `http` integration is an
+    after_dependency, so `hass.http` (the server) is available by now.
+    """
+    if hass.data.get("_orei_http_view_registered"):
+        return
+    try:
+        from .http_view import OreiCoverView
+
+        hass.http.register_view(OreiCoverView)
+        hass.data["_orei_http_view_registered"] = True
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.warning(
+            "Could not register cover-art view (media cards will show the "
+            "default placeholder). %s: %s",
+            type(err).__name__,
+            err,
+        )
 
 
 # ------------------------------------------------------------------ services

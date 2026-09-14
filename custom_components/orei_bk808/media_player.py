@@ -87,6 +87,14 @@ def _dev(host: str) -> DeviceInfo:
     )
 
 
+# Static cover art, served by this integration's HomeAssistantView (see
+# http_view.py) at <frontend>/local/orei_bk808/cover.jpg. A relative path
+# always resolves against the frontend's own origin, so it works with or
+# without an external/internal URL and behind any reverse proxy.
+# Drop your own ``static/cover.jpg`` into the integration folder to swap it.
+_COVER_URL = "/local/orei_bk808/cover.jpg"
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]
     hostname = str(coordinator.host).replace(".", "_")
@@ -107,6 +115,9 @@ class _BasePlayer(MediaPlayerEntity, CoordinatorEntity):
         self._side = side
         self._port = port
         self._hostname = hostname
+        # Static cover art served from the bundled static/ dir by this
+        # integration's HomeAssistantView (see http_view.py).
+        self._attr_media_image_url = _COVER_URL
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -138,8 +149,9 @@ class _MediaInputPlayer(_BasePlayer):
 
     def __init__(self, coordinator, port: int, hostname: str):
         super().__init__(coordinator, "input", port, hostname)
-        # Clean, deterministic name -> entity id media_player.input_<N>
-        self._attr_name = f"Input {port}"
+        # Show the user-defined input name (falls back to "Input N") while keeping
+        # a stable unique id. Entity id stays media_player.input_<N>-ish.
+        self._attr_name = coordinator.input_display_name(port)
         self._attr_unique_id = f"{hostname}_input_{port}"
 
     @property
@@ -210,8 +222,9 @@ class _MediaOutputPlayer(_BasePlayer):
 
     def __init__(self, coordinator, port: int, hostname: str):
         super().__init__(coordinator, "output", port, hostname)
-        # Clean, deterministic name -> entity id media_player.output_<N>
-        self._attr_name = f"Output {port}"
+        # Show the user-defined output name (falls back to "Output N") while
+        # keeping a stable unique id.
+        self._attr_name = coordinator.output_display_name(port)
         self._attr_unique_id = f"{hostname}_output_{port}"
 
     @property
