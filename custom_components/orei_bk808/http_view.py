@@ -30,6 +30,10 @@ class OreiCoverView(HomeAssistantView):
     """Serve only the bundled cover image. Unauthenticated + CORS-open so
     the media-control card (which loads it as a plain <img>) always renders."""
 
+    # `name` is required by HomeAssistantView.register_view (aiohttp uses it
+    # to name the route). `url` alone is not enough — without `name` setup
+    # raises and the route is silently never added.
+    name = "orei_bk808_cover"
     url = _URL
     extra_urls = []
     requires_auth = False
