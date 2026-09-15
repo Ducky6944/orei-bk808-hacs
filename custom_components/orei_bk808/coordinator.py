@@ -175,16 +175,39 @@ class OreiCoordinator(DataUpdateCoordinator):
 
     # ------------------------------------------------------------------ polling
 
+    async def _read_video_blob(self) -> Optional[Dict[str, Any]]:
+        """Return the video/routing blob, or None if this attempt didn't yield one.
+
+        The device is a sticky single-connection socket: it latches the payload
+        it last generated and keeps returning it, so a plain GET keeps serving
+        the latched blob regardless of the `comhead` we ask. A POST to
+        /cgi-bin/instr reliably *re-latches* the device onto the requested blob
+        — the only way to pull back the video/routing blob once another call
+        (e.g. the config flow's `get input status`) has latched a non-video
+        one. So POST is the reliable read; GET is a fallback that helps when the
+        device is already latched on the video blob.
+        """
+        try:
+            body = await self.send_command("get video status")
+            if isinstance(body, dict) and "allsource" in body:
+                return body
+        except (aiohttp.ClientError, aiohttp.ServerTimeoutError):
+            pass  # fall through to the GET fallback / next retry
+        try:
+            body = await self._query("get video status")
+            if isinstance(body, dict) and "allsource" in body:
+                return body
+        except (aiohttp.ClientError, aiohttp.ServerTimeoutError):
+            pass
+        return None
+
     async def _fetch_states(self) -> bool:
         """Hit the device for fresh routing state.
 
         The only thing we actually *consume* from the device is the routing
-        blob (`allsource`, plus the port names and power it carries). The
-        device is single-connection and sticky: it latches the payload it
-        returns regardless of which `comhead` we ask for, and that payload
-        sometimes is the video/preset blob and sometimes an `input status`
-        blob. So we poll until we capture a body that carries `allsource`,
-        treating that as success.
+        blob (`allsource`, plus the port names and power it carries). Poll (via
+        `send_command`'s sticky-latch-recovering POST, see `_read_video_blob`)
+        until we capture a body carrying `allsource`, treating that as success.
 
         Returns True if a usable routing blob was read this round.
         """
@@ -196,18 +219,24 @@ class OreiCoordinator(DataUpdateCoordinator):
         for _ in range(attempts):
             if fresh_video is not None:
                 break
-            try:
-                body = await self._query("get video status")
-            except (aiohttp.ClientError, aiohttp.ServerTimeoutError) as err:
-                last_error = err
-                continue
-            body = body if isinstance(body, dict) else {}
-            if "allsource" in body:
+            body = await self._read_video_blob()
+            if body is not None:
                 fresh_video = body
-            # Capture cec-style payload opportunistically (secondary power
-            # fallback only — never required for success).
-            if fresh_cec is None and ("inputindex" in body or "outputindex" in body):
-                fresh_cec = body
+                # Capture cec-style payload opportunistically (secondary power
+                # fallback only — never required for success).
+                if fresh_cec is None and (
+                    "inputindex" in body or "outputindex" in body
+                ):
+                    fresh_cec = body
+            else:
+                try:
+                    cec = await self.send_command("get cec status")
+                    if isinstance(cec, dict) and (
+                        "inputindex" in cec or "outputindex" in cec
+                    ):
+                        fresh_cec = cec
+                except (aiohttp.ClientError, aiohttp.ServerTimeoutError) as err:
+                    last_error = last_error or err
 
         # Only replace cached state with what we actually read this round.
         if fresh_video is not None:

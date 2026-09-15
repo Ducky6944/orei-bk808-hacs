@@ -213,7 +213,16 @@ class OreiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_naming(self, user_input: dict | None = None) -> dict:
-        """Optional rename step. Pre-filled with the device's own port names."""
+        """Rename step. The text fields are the source of truth and are
+        pre-filled with the device's own port names, so:
+          * do nothing  -> the device's names are used (they "pull perfectly"),
+          * edit fields -> your names are used (no hidden toggle to trip on).
+        We intentionally do *not* keep a "use device names" checkbox here:
+        the fields already contain the device names, so a boolean that either
+        overwrites or preserves them is redundant and was the source of both
+        the "checkbox always looks unchecked" confusion and the earlier
+        "several attempts" bug (a checked box silently discarding edits).
+        """
         device_in = ",".join(n for n in self._device_input_names if n.strip())
         device_out = ",".join(n for n in self._device_output_names if n.strip())
         schema = vol.Schema(
@@ -228,24 +237,13 @@ class OreiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         device_out if device_out else ",".join(DEFAULT_OUTPUT_NAMES)
                     ),
                 ): str,
-                # Default OFF: the name fields above are already pre-filled
-                # with the device's own names, so leaving this unchecked both
-                # "picks up" the device names AND respects any edit the user
-                # made. Checking it re-pulls the raw device names verbatim.
-                # (Defaulting to True here was discarding the user's typed
-                # names, which is why naming took several attempts.)
-                vol.Optional("use_device_names", default=False): bool,
             }
         )
 
         if user_input is not None:
-            if user_input.get("use_device_names", False):
-                # Use whatever the device reported (already stored)
-                chosen_in = self._device_input_names
-                chosen_out = self._device_output_names
-            else:
-                chosen_in = _split_names(user_input.get(CONF_INPUT_NAMES, ""))
-                chosen_out = _split_names(user_input.get(CONF_OUTPUT_NAMES, ""))
+            # The text fields are authoritative — whatever the user left in them.
+            chosen_in = _split_names(user_input.get(CONF_INPUT_NAMES, ""))
+            chosen_out = _split_names(user_input.get(CONF_OUTPUT_NAMES, ""))
 
             # Pad to NUM_PORTS so the coordinator's index math is safe even
             # if the user left trailing slots blank.

@@ -44,9 +44,10 @@ async def test_successful_setup_with_device_names(hass, enable_custom_integratio
         assert result["type"] == "form"
         assert result["step_id"] == "naming"
 
-        # Explicitly adopt the device-reported names and finish.
+        # Naming fields are pre-filled with the device's names. Accept them
+        # as-is (empty user_input -> defaults fill in the device names).
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input={"use_device_names": True}
+            result["flow_id"], user_input={}
         )
         assert result["type"] == "create_entry"
         assert result["title"] == "10.0.50.81"

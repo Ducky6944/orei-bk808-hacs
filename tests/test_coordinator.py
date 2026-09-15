@@ -61,3 +61,26 @@ async def test_coordinator_initialization(hass):
     assert coord.output_display_name(1) == "Test Out 1"
     assert coord.get_routed_input(1) is None
     await coord.shutdown()
+
+
+@pytest.mark.skipif(True, reason="live guard — run manually with OROE_LIVE_HOST=<ip>")
+async def test_live_setup_recovers(hass):
+    """Local-only guard for the sticky-latch setup bug (see _read_video_blob).
+    Run with:  OROE_LIVE_HOST=10.0.50.81 python -m pytest -k live_setup -s"""
+    import os
+
+    import pytest_socket
+
+    host = os.environ.get("OROE_LIVE_HOST", "10.0.50.81")
+    pytest_socket.socket_allow_hosts([host])
+    pytest_socket.enable_socket()
+    coord = OreiCoordinator(hass=hass, host=host)
+    try:
+        await coord.send_command("get input status")
+        await coord.send_command("get output status")
+        ok = await coord._fetch_states()
+        assert ok
+        assert "allsource" in coord._video_state
+        await coord._fetch_port_status()
+    finally:
+        await coord.shutdown()
