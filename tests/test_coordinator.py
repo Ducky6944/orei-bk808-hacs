@@ -24,6 +24,10 @@ def test_cec_output_commands_have_icons():
         assert isinstance(label, str) and label
 
 
+def test_num_ports():
+    assert NUM_PORTS == 8
+
+
 @pytest.mark.asyncio
 async def test_port_status_read_api(hass):
     """input_is_on / output_is_on default to off and reflect the status arrays."""

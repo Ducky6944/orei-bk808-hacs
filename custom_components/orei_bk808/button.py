@@ -28,7 +28,9 @@ def _dev(host: str) -> DeviceInfo:
     )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
+):
     coordinator = hass.data[DOMAIN][entry.entry_id]
     hostname = str(coordinator.host).replace(".", "_")
     entities: list = []
@@ -50,7 +52,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 class CecButton(ButtonEntity, CoordinatorEntity):
     """CEC button — sends a single CEC command to one input or output port."""
-
 
     def __init__(
         self,
@@ -84,8 +85,6 @@ class CecButton(ButtonEntity, CoordinatorEntity):
     async def async_press(self) -> None:
         try:
             await self.coordinator.send_cec(self._side, self._port, self._cmd)
-            _LOGGER.info(
-                "CEC %s %d -> %s", self._side.title(), self._port, self._cmd
-            )
+            _LOGGER.info("CEC %s %d -> %s", self._side.title(), self._port, self._cmd)
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("CEC push failed: %s", err, exc_info=True)

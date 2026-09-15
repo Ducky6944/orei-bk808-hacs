@@ -40,7 +40,9 @@ def _dev(host: str) -> DeviceInfo:
     )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
+):
     coordinator = hass.data[DOMAIN][entry.entry_id]
     hostname = str(coordinator.host).replace(".", "_")
     entities: list = [
@@ -72,10 +74,25 @@ class InputRemoteSelect(SelectEntity, CoordinatorEntity):
     @property
     def options(self) -> list:
         order = [
-            "power_on", "power_off", "play", "pause", "stop", "next_track",
-            "prev_track", "rewind", "fast_forward", "mute",
-            "volume_up", "volume_down", "menu", "enter", "up", "down",
-            "left", "right", "loop",
+            "power_on",
+            "power_off",
+            "play",
+            "pause",
+            "stop",
+            "next_track",
+            "prev_track",
+            "rewind",
+            "fast_forward",
+            "mute",
+            "volume_up",
+            "volume_down",
+            "menu",
+            "enter",
+            "up",
+            "down",
+            "left",
+            "right",
+            "loop",
         ]
         opts = []
         for cmd in order + list(CEC_INPUT_COMMANDS):
@@ -123,17 +140,26 @@ class OutputRemoteSelect(SelectEntity, CoordinatorEntity):
 
     @property
     def routing_options(self) -> list[str]:
-        return [
-            self.coordinator.input_display_name(i)
-            for i in range(1, NUM_PORTS + 1)
-        ]
+        return [self.coordinator.input_display_name(i) for i in range(1, NUM_PORTS + 1)]
 
     @property
     def options(self) -> list:
         cec_order = [
-            "power_on", "power_off", "play", "pause", "next_track",
-            "prev_track", "mute", "volume_up", "volume_down", "enter",
-            "menu", "loop", "left", "right", "down",
+            "power_on",
+            "power_off",
+            "play",
+            "pause",
+            "next_track",
+            "prev_track",
+            "mute",
+            "volume_up",
+            "volume_down",
+            "enter",
+            "menu",
+            "loop",
+            "left",
+            "right",
+            "down",
         ]
         cec_options = []
         for cmd in cec_order + list(CEC_OUTPUT_COMMANDS):

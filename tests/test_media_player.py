@@ -38,7 +38,7 @@ async def test_output_player_reports_on_or_off(hass):
 
     # Sinks on outputs 2 and 3 connected/on -> on.
     coord._output_connect = [False, True, True, False, False, False, False, False]
-    assert out1.state == "off"          # output 1 not connected
+    assert out1.state == "off"  # output 1 not connected
     assert coord.output_is_on(2) is True
     out2 = _MediaOutputPlayer(coord, 2, "test_local")
     assert out2.state == "on"

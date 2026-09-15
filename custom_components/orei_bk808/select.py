@@ -18,7 +18,9 @@ from .const import DOMAIN, NUM_PORTS
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
+):
     coordinator = hass.data[DOMAIN][entry.entry_id]
     entities = [OutputRouteSelect(coordinator, o) for o in range(1, NUM_PORTS + 1)]
     async_add_entities(entities)
@@ -49,9 +51,7 @@ class OutputRouteSelect(SelectEntity, CoordinatorEntity):
 
     @property
     def options(self) -> list:
-        return [
-            self.coordinator.input_display_name(i) for i in range(1, NUM_PORTS + 1)
-        ]
+        return [self.coordinator.input_display_name(i) for i in range(1, NUM_PORTS + 1)]
 
     @property
     def current_option(self) -> str | None:

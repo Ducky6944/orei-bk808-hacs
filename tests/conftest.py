@@ -13,21 +13,41 @@ from custom_components.orei_bk808.coordinator import OreiCoordinator
 
 @pytest.fixture
 def sample_video_status():
-    """Sample `get video status` body (allsource is a flat list, one entry per output)."""
+    """Sample `get video status` body (allsource is a flat list)."""
     return {
         "comhead": "get video status",
         "power": 1,
         "allsource": [5, 2, 1, 1, 1, 3, 1, 1],
         "allinputname": [
-            "Unifi Protect", "Playstation 5", "Nintendo Switch", "Xbox Series X",
-            "Gaming PC", "Apple TV", "Nvidia Shield", "Theater Zone 2",
+            "Unifi Protect",
+            "Playstation 5",
+            "Nintendo Switch",
+            "Xbox Series X",
+            "Gaming PC",
+            "Apple TV",
+            "Nvidia Shield",
+            "Theater Zone 2",
         ],
         "alloutputname": [
-            "Theater AVR", "Living Room AVR", "Main Bedroom Projector", "Kids Bedroom TV",
-            "Guest Bedroom TV", "Living Room Balcony Amp", "Output7", "Output8",
+            "Theater AVR",
+            "Living Room AVR",
+            "Main Bedroom Projector",
+            "Kids Bedroom TV",
+            "Guest Bedroom TV",
+            "Living Room Balcony Amp",
+            "Output7",
+            "Output8",
         ],
-        "allname": ["Preset1", "Preset2", "Preset3", "Preset4",
-                    "Preset5", "Preset6", "Preset7", "Preset8"],
+        "allname": [
+            "Preset1",
+            "Preset2",
+            "Preset3",
+            "Preset4",
+            "Preset5",
+            "Preset6",
+            "Preset7",
+            "Preset8",
+        ],
         "version": "V1.10.01",
     }
 
@@ -38,10 +58,26 @@ def sample_cec_status():
     return {
         "comhead": "get cec status",
         "power": 1,
-        "allinputname": ["In A", "In B", "In C", "In D",
-                         "In E", "In F", "In G", "In H"],
-        "alloutputname": ["Out A", "Out B", "Out C", "Out D",
-                          "Out E", "Out F", "Out G", "Out H"],
+        "allinputname": [
+            "In A",
+            "In B",
+            "In C",
+            "In D",
+            "In E",
+            "In F",
+            "In G",
+            "In H",
+        ],
+        "alloutputname": [
+            "Out A",
+            "Out B",
+            "Out C",
+            "Out D",
+            "Out E",
+            "Out F",
+            "Out G",
+            "Out H",
+        ],
         "inputindex": [1, 0, 0, 0, 0, 0, 0, 0],
         "outputindex": [1, 0, 0, 0, 0, 0, 0, 0],
     }
@@ -59,7 +95,9 @@ def mock_coordinator(hass: HomeAssistant):
 
 
 @pytest.fixture
-async def initialized_integration(hass: HomeAssistant, sample_video_status, sample_cec_status):
+async def initialized_integration(
+    hass: HomeAssistant, sample_video_status, sample_cec_status
+):
     """Set up a fully initialized integration with mocked HTTP."""
 
     def _get(url, params=None, **kwargs):
@@ -77,7 +115,9 @@ async def initialized_integration(hass: HomeAssistant, sample_video_status, samp
         new=lambda self: _make_update(self, sample_video_status, sample_cec_status),
     ), patch(
         "custom_components.orei_bk808.coordinator.OreiCoordinator._query",
-        new=lambda self, comhead: _make_query(self, comhead, sample_video_status, sample_cec_status),
+        new=lambda self, comhead: _make_query(
+            self, comhead, sample_video_status, sample_cec_status
+        ),
     ):
         from homeassistant.config_entries import ConfigEntry
 
@@ -87,9 +127,26 @@ async def initialized_integration(hass: HomeAssistant, sample_video_status, samp
             title="test.local",
             data={
                 "host": "test.local",
-                "input_names": ["PS5", "Xbox", "PC", "Apple TV", "Shield", "Cameras", "Zone 2", "Backup"],
-                "output_names": ["Living Room", "Bedroom", "Projector", "Kitchen",
-                                 "Guest", "Balcony", "Out 7", "Out 8"],
+                "input_names": [
+                    "PS5",
+                    "Xbox",
+                    "PC",
+                    "Apple TV",
+                    "Shield",
+                    "Cameras",
+                    "Zone 2",
+                    "Backup",
+                ],
+                "output_names": [
+                    "Living Room",
+                    "Bedroom",
+                    "Projector",
+                    "Kitchen",
+                    "Guest",
+                    "Balcony",
+                    "Out 7",
+                    "Out 8",
+                ],
             },
             source="user",
             entry_id="test_entry_1",
@@ -111,6 +168,7 @@ def _make_update(self, video, cec):
         if "alloutputname" in video:
             self._device_outputs = list(video["alloutputname"])[:8]
         return {"video": video, "cec": cec}
+
     return _update()
 
 
@@ -121,4 +179,5 @@ def _make_query(self, comhead, video, cec):
             return video
         self._cec_state = cec
         return cec
+
     return _query()

@@ -10,7 +10,16 @@ SAMPLE = {
     "comhead": "get cec status",
     "power": 1,
     "allinputname": ["A", "B", "C", "D", "E", "F", "G", "H"],
-    "alloutputname": ["Out A", "Out B", "Out C", "Out D", "Out E", "Out F", "Out G", "Out H"],
+    "alloutputname": [
+        "Out A",
+        "Out B",
+        "Out C",
+        "Out D",
+        "Out E",
+        "Out F",
+        "Out G",
+        "Out H",
+    ],
     "inputindex": [1, 0, 0, 0, 0, 0, 0, 0],
     "outputindex": [1, 0, 0, 0, 0, 0, 0, 0],
 }
@@ -24,9 +33,7 @@ async def test_successful_setup(hass, enable_custom_integrations):
         assert host == "192.168.1.100"
         return SAMPLE
 
-    with patch(
-        "custom_components.orei_bk808.config_flow._validate", new=_validate
-    ):
+    with patch("custom_components.orei_bk808.config_flow._validate", new=_validate):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": SOURCE_USER}
         )
@@ -59,9 +66,7 @@ async def test_connection_failed(hass, enable_custom_integrations):
     async def _validate(host):
         raise aiohttp.ClientError("boom")
 
-    with patch(
-        "custom_components.orei_bk808.config_flow._validate", new=_validate
-    ):
+    with patch("custom_components.orei_bk808.config_flow._validate", new=_validate):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": SOURCE_USER}
         )

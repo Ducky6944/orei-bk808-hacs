@@ -83,8 +83,6 @@ read back.
 - **Non-blocking I/O in the event loop.** Any `read_bytes`, file, or sync
   network call inside `async` code must go through `asyncio.to_thread(...)`.
   (This caught two real bugs — see gotchas.)
-- **Stub-test before release.** Run `pytest` and confirm byte-compile clean
-  before bumping the version.
 - **Python < 3.12** compatibility for the HA runtime in `hacs.json`; CI runs
   on 3.11. Local dev/verified on 3.13.
 - **Feature-flag / const resolution**: read from `const.py` (CEC tables,
@@ -94,9 +92,26 @@ read back.
   `coordinator.output_display_name(o)`. Do NOT hardcode "Input N" /
   "Output N".
 
+## Lint & quality gates
+
+Toolchain is **black** + **flake8** — the exact two CI runs in
+`.github/workflows/tests.yml`. Install if missing with `pip install black flake8`.
+
+- **black** (line length 88, its default; the project targets 88).
+  Format with `python -m black custom_components/ tests/`.
+- **flake8** is configured via **`.flake8`**: `max-line-length = 88`,
+  `extend-ignore = E203, W503, W504`.
+  Run `python -m flake8 custom_components/ tests/`.
+- Both must pass before release; they mirror CI so a green local run equals
+  a green CI run.
+- **Stub-test before release.** Run the full gate:
+  `python -m pytest tests/` + `python -m black --check custom_components/ tests/`
+  + `python -m flake8 custom_components/ tests/` + `python -m compileall -q ...`.
+
 ## Release process
 
-1. Confirm `pytest` green + `python -m compileall` clean.
+1. Run the full lint & quality gate (see above): `pytest` + `black --check`
+   + `flake8` + `compileall`, all clean.
 2. Bump `"version"` in `custom_components/orei_bk808/manifest.json`.
 3. `git add -A && git commit -m "vX.Y.Z: <summary>"`.
 4. `git tag vX.Y.Z`, `git push origin <branch> --follow-tags`
@@ -124,11 +139,15 @@ read back.
 - **`async def` for HA HTTP handlers.** `http_view` handler must be
   `async def`, not a plain function.
 
-## Current state (as of v1.4.6, in preparation)
+## Current state (v1.4.7 in preparation)
 
-- v1.4.6 changes are complete and green locally: media-player state now
-  `"on"`/`"off"` from real port status; services.yaml `on` quoted;
-  http_view + cover bytes made async; dead `_stop` handler removed;
-  stale `test_connection` string removed; README + entity tables updated;
-  `test_media_player.py` added; `pytest.ini` added.
-- **Not yet done:** commit v1.4.6, tag `v1.4.6`, push, create the release.
+- **v1.4.6 is released** (tag `v1.4.6`): media-player state now `"on"`/`"off"`
+  from real port status; services.yaml `on` quoted; http_view + cover bytes
+  made async; dead `_stop` handler removed; stale `test_connection` string
+  removed; README + entity tables updated; `test_media_player.py` + `pytest.ini`
+  added; `AGENTS.md` added.
+- **Lint hardened (v1.4.7):** ran the whole codebase through `black` (13 files
+  reformatted to 88-col), added `.flake8` so flake8 matches black, fixed a
+  stray unused `NUM_PORTS` import, tightened a long docstring in conftest.
+  All gates green: 9 pytest tests pass, `black --check` clean, `flake8` clean
+  (custom_components + tests).
