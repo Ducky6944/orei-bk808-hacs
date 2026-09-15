@@ -44,25 +44,114 @@ def _pad_names(names: list[str]) -> list[str]:
     return out
 
 
-async def _validate(host: str) -> dict:
-    """Hit the matrix and return whatever state snapshot comes back.
+def _extract_names(body: dict) -> tuple[list[str] | None, list[str] | None]:
+    """Pull (input_names, output_names) out of a single device body, if present.
 
-    The device alternates between `get video status` and `get cec status`
-    responses; either one may carry the `allinputname`/`alloutputname`
-    fields, which is all we need here.
+    The BK808 carries its port names in more than one place depending on
+    which sticky response is returned:
+      * `allinputname` / `alloutputname`  (the `get video status` blob)
+      * `inname`                          (the `get input status` blob)
+      * `name`                            (the `get output status` blob)
+    We accept whichever of those keys are present and are non-empty lists.
+    Either returned value may be None when that body did not carry it.
+    """
+    input_names = output_names = None
+    if isinstance(body, dict):
+        for key in ("allinputname", "inname"):
+            val = body.get(key)
+            if isinstance(val, list) and any(str(n).strip() for n in val):
+                input_names = list(val)
+                break
+        for key in ("alloutputname", "name"):
+            val = body.get(key)
+            if isinstance(val, list) and any(str(n).strip() for n in val):
+                output_names = list(val)
+                break
+    return input_names, output_names
+
+
+async def _validate(host: str) -> dict:
+    """Reach the matrix and gather its port names (best effort).
+
+    Returns {"input_names": [...], "output_names": [...]} — either list may
+    be empty. The device is single-connection and sticky: it latches whatever
+    blob it last generated regardless of the `comhead` we ask for. So we try
+    several `comhead`s, merge the name sets we do find, and treat reachability
+    (a 200 JSON body) as the success criterion, not the presence of names.
     """
     timeout = aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT)
-    url = f"https://{host}/cgi-bin/query"
-    for comhead in ("get cec status", "get video status"):
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                url, params={"comhead": comhead}, timeout=timeout, ssl=False
-            ) as resp:
-                resp.raise_for_status()
-                body = json.loads(await resp.text())
-                if "allinputname" in body or "alloutputname" in body:
-                    return body
-    return {}
+    base = f"https://{host}"
+    input_names: list[str] | None = None
+    output_names: list[str] | None = None
+
+    async def _get(comhead: str) -> dict | None:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{base}/cgi-bin/query",
+                    params={"comhead": comhead},
+                    timeout=timeout,
+                    ssl=False,
+                ) as resp:
+                    resp.raise_for_status()
+                    return json.loads(await resp.text())
+        except (aiohttp.ClientError, aiohttp.ServerTimeoutError, ValueError):
+            return None
+
+    async def _post(comhead: str) -> dict | None:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{base}/cgi-bin/instr",
+                    json={"comhead": comhead},
+                    headers={
+                        "Accept": "application/json",
+                        "Content-Type": "application/json",
+                    },
+                    timeout=timeout,
+                    ssl=False,
+                ) as resp:
+                    resp.raise_for_status()
+                    return json.loads(await resp.text())
+        except (aiohttp.ClientError, aiohttp.ServerTimeoutError, ValueError):
+            return None
+
+    def _merge(body: dict | None) -> None:
+        nonlocal input_names, output_names
+        if body is None:
+            return
+        in_names, out_names = _extract_names(body)
+        if input_names is None and in_names:
+            input_names = in_names
+        if output_names is None and out_names:
+            output_names = out_names
+
+    # Pass 1: the GET-based endpoints. On this device a `get video status`
+    # blob carries both `allinputname` and `alloutputname`; that's the
+    # reliable source for *both*.
+    for comhead in (
+        "get video status",
+        "get cec status",
+        "get input status",
+        "get output status",
+    ):
+        _merge(await _get(comhead))
+        if input_names and output_names:
+            break  # have both; done.
+
+    # Pass 2: the sticky device sometimes latches one response and keeps
+    # returning it regardless of `comhead`, so a GET may not have handed us
+    # the input names. POST to /cgi-bin/instr reliably yields the specific
+    # blob we ask for — use it for whichever name set is still missing.
+    if not input_names:
+        _merge(await _post("get input status"))
+    if not output_names:
+        _merge(await _post("get output status"))
+
+    return {
+        "input_names": input_names or [],
+        "output_names": output_names or [],
+    }
 
 
 class OreiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -102,10 +191,10 @@ class OreiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Stash the device-reported names (may be empty) so the
                 # naming step can pre-fill them.
                 self._device_input_names = _pad_names(
-                    list(state.get("allinputname", []))
+                    list(state.get("input_names", []))
                 )
                 self._device_output_names = _pad_names(
-                    list(state.get("alloutputname", []))
+                    list(state.get("output_names", []))
                 )
                 return await self.async_step_naming()
 
@@ -139,15 +228,18 @@ class OreiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         device_out if device_out else ",".join(DEFAULT_OUTPUT_NAMES)
                     ),
                 ): str,
-                vol.Optional(
-                    "use_device_names",
-                    default=bool(device_in and device_out),
-                ): bool,
+                # Default OFF: the name fields above are already pre-filled
+                # with the device's own names, so leaving this unchecked both
+                # "picks up" the device names AND respects any edit the user
+                # made. Checking it re-pulls the raw device names verbatim.
+                # (Defaulting to True here was discarding the user's typed
+                # names, which is why naming took several attempts.)
+                vol.Optional("use_device_names", default=False): bool,
             }
         )
 
         if user_input is not None:
-            if user_input.get("use_device_names", True):
+            if user_input.get("use_device_names", False):
                 # Use whatever the device reported (already stored)
                 chosen_in = self._device_input_names
                 chosen_out = self._device_output_names
