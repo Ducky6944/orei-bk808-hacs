@@ -186,6 +186,11 @@ class OreiCoordinator(DataUpdateCoordinator):
         (e.g. the config flow's `get input status`) has latched a non-video
         one. So POST is the reliable read; GET is a fallback that helps when the
         device is already latched on the video blob.
+
+        Interlocks with config_flow._validate: setup runs the coordinator read
+        immediately after the config flow, which ends on a POST that latches a
+        non-video blob. We stay correct because we also POST here. Do not switch
+        this to GET without updating _validate (see its note).
         """
         try:
             body = await self.send_command("get video status")
