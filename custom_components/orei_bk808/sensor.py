@@ -24,7 +24,9 @@ def _dev(host: str) -> DeviceInfo:
     )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
+):
     coordinator = hass.data[DOMAIN][entry.entry_id]
     hostname = str(coordinator.host).replace(".", "_")
     entities: list = [

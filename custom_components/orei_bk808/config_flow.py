@@ -125,25 +125,19 @@ class OreiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_naming(self, user_input: dict | None = None) -> dict:
         """Optional rename step. Pre-filled with the device's own port names."""
-        device_in = ",".join(
-            n for n in self._device_input_names if n.strip()
-        )
-        device_out = ",".join(
-            n for n in self._device_output_names if n.strip()
-        )
+        device_in = ",".join(n for n in self._device_input_names if n.strip())
+        device_out = ",".join(n for n in self._device_output_names if n.strip())
         schema = vol.Schema(
             {
                 vol.Optional(
                     CONF_INPUT_NAMES,
-                    default=device_in
-                    if device_in
-                    else ",".join(DEFAULT_INPUT_NAMES),
+                    default=device_in if device_in else ",".join(DEFAULT_INPUT_NAMES),
                 ): str,
                 vol.Optional(
                     CONF_OUTPUT_NAMES,
-                    default=device_out
-                    if device_out
-                    else ",".join(DEFAULT_OUTPUT_NAMES),
+                    default=(
+                        device_out if device_out else ",".join(DEFAULT_OUTPUT_NAMES)
+                    ),
                 ): str,
                 vol.Optional(
                     "use_device_names",
@@ -233,8 +227,12 @@ class OreiOptionsFlowHandler(config_entries.OptionsFlow):
             else:
                 chosen_in = _split_names(user_input.get(CONF_INPUT_NAMES, ""))
                 chosen_out = _split_names(user_input.get(CONF_OUTPUT_NAMES, ""))
-            chosen_in = [n or f"Input {i+1}" for i, n in enumerate(_pad_names(chosen_in))]
-            chosen_out = [n or f"Output {i+1}" for i, n in enumerate(_pad_names(chosen_out))]
+            chosen_in = [
+                n or f"Input {i+1}" for i, n in enumerate(_pad_names(chosen_in))
+            ]
+            chosen_out = [
+                n or f"Output {i+1}" for i, n in enumerate(_pad_names(chosen_out))
+            ]
 
             data = dict(entry.data)
             data[CONF_INPUT_NAMES] = chosen_in

@@ -23,7 +23,9 @@ def _dev(host: str) -> DeviceInfo:
     )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
+):
     coordinator = hass.data[DOMAIN][entry.entry_id]
     entities: list = [MatrixPower(coordinator)]
     for o in range(1, NUM_PORTS + 1):
@@ -72,7 +74,9 @@ class OutputMute(SwitchEntity, CoordinatorEntity):
         self._out = output_num
         hostname = str(coordinator.host).replace(".", "_")
         self._attr_unique_id = f"{hostname}_output_{output_num}_mute"
-        self._muted = False  # best-effort; the device doesn't expose a per-output mute read
+        self._muted = (
+            False  # best-effort; the device doesn't expose a per-output mute read
+        )
 
     @property
     def name(self) -> str:

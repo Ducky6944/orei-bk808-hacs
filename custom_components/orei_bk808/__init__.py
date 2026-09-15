@@ -63,7 +63,10 @@ async def async_initial_refresh(
             last = err
             _LOGGER.debug(
                 "Initial refresh attempt %d/%d for %s failed: %s",
-                i + 1, tries, coordinator.host, err,
+                i + 1,
+                tries,
+                coordinator.host,
+                err,
             )
             if i < tries - 1:
                 await asyncio.sleep(delay)
@@ -148,6 +151,7 @@ _NUM_1_8 = vol.Range(min=1, max=NUM_PORTS)
 
 def _register_services(hass: HomeAssistant) -> None:
     """Register all HA services for the matrix."""
+
     async def _route(call: ServiceCall) -> None:
         input_num = int(call.data[ATTR_INPUT])
         output_num = int(call.data[ATTR_OUTPUT])

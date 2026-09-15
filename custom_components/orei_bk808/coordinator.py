@@ -98,7 +98,9 @@ class OreiCoordinator(DataUpdateCoordinator):
         if not (1 <= output_num <= NUM_PORTS):
             return f"Output {output_num}"
         o = output_num - 1
-        return self._output_names[o] or self._device_outputs[o] or f"Output {output_num}"
+        return (
+            self._output_names[o] or self._device_outputs[o] or f"Output {output_num}"
+        )
 
     # ------------------------------------------------------------------ HTTP
 
@@ -111,14 +113,17 @@ class OreiCoordinator(DataUpdateCoordinator):
             body = await resp.text()
             if resp.status != 200:
                 raise aiohttp.ClientResponseError(
-                    resp.request_info, resp.history,
-                    status=resp.status, message=f"HTTP {resp.status}: {body[:200]}",
+                    resp.request_info,
+                    resp.history,
+                    status=resp.status,
+                    message=f"HTTP {resp.status}: {body[:200]}",
                 )
             try:
                 return json.loads(body)
             except ValueError:
                 raise aiohttp.ClientResponseError(
-                    resp.request_info, resp.history,
+                    resp.request_info,
+                    resp.history,
                     status=resp.status,
                     message=f"Non-JSON response: {body[:200]!r}",
                 )
@@ -136,16 +141,16 @@ class OreiCoordinator(DataUpdateCoordinator):
             body = await resp.text()
             if resp.status != 200:
                 raise aiohttp.ClientResponseError(
-                    resp.request_info, resp.history,
-                    status=resp.status, message=f"HTTP {resp.status}: {body[:200]}",
+                    resp.request_info,
+                    resp.history,
+                    status=resp.status,
+                    message=f"HTTP {resp.status}: {body[:200]}",
                 )
             if body and body != "\n":
                 try:
                     return json.loads(body)
                 except ValueError:
-                    _LOGGER.warning(
-                        "Command received non-JSON body: %r", body[:200]
-                    )
+                    _LOGGER.warning("Command received non-JSON body: %r", body[:200])
             else:
                 _LOGGER.debug("Command accepted (200, empty body)")
             return {}
@@ -159,7 +164,9 @@ class OreiCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("OK %s -> %s", comhead, result)
             return result
         except aiohttp.ClientError as err:
-            _LOGGER.error("Communication error on %s from %s: %s", comhead, self.host, err)
+            _LOGGER.error(
+                "Communication error on %s from %s: %s", comhead, self.host, err
+            )
             raise
 
     async def _query(self, comhead: str) -> Dict[str, Any]:
@@ -199,10 +206,7 @@ class OreiCoordinator(DataUpdateCoordinator):
                 fresh_video = body
             # Capture cec-style payload opportunistically (secondary power
             # fallback only — never required for success).
-            if (
-                fresh_cec is None
-                and ("inputindex" in body or "outputindex" in body)
-            ):
+            if fresh_cec is None and ("inputindex" in body or "outputindex" in body):
                 fresh_cec = body
 
         # Only replace cached state with what we actually read this round.
@@ -364,13 +368,17 @@ class OreiCoordinator(DataUpdateCoordinator):
     async def set_cec_inputs(self, mask: List[int]) -> None:
         """Select which input ports are CEC-enabled (8-element mask)."""
         await self.send_command(
-            "set cec index", inputindex=list(mask)[:NUM_PORTS], outputindex=[0] * NUM_PORTS
+            "set cec index",
+            inputindex=list(mask)[:NUM_PORTS],
+            outputindex=[0] * NUM_PORTS,
         )
 
     async def set_cec_outputs(self, mask: List[int]) -> None:
         """Select which output ports are CEC-enabled (8-element mask)."""
         await self.send_command(
-            "set cec index", inputindex=[0] * NUM_PORTS, outputindex=list(mask)[:NUM_PORTS]
+            "set cec index",
+            inputindex=[0] * NUM_PORTS,
+            outputindex=list(mask)[:NUM_PORTS],
         )
 
     async def send_cec(
@@ -389,9 +397,7 @@ class OreiCoordinator(DataUpdateCoordinator):
         mask[port_num - 1] = 1
         obj = 0 if side == "input" else 1
 
-        await self.send_command(
-            "cec command", object=obj, port=mask, index=idx
-        )
+        await self.send_command("cec command", object=obj, port=mask, index=idx)
 
     # Presets ------------------------------------------------------------------
     async def recall_preset(self, index: int) -> None:

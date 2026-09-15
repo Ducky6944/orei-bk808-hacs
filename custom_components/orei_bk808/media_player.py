@@ -25,6 +25,7 @@ from .const import DOMAIN, NUM_PORTS
 
 _LOGGER = logging.getLogger(__name__)
 
+
 # --- Feature flags (resilient to HA moving/renaming the enum) -----------------
 # Current HA exports the flag as `MediaPlayerEntityFeature`, while older builds
 # expose `MediaPlayerFeature`. We try both names in both the package and the
@@ -35,6 +36,7 @@ _LOGGER = logging.getLogger(__name__)
 def _resolve_feature_flag():
     from homeassistant.components import media_player as _mp
     from homeassistant.components.media_player import const as _const
+
     for module in (_mp, _const):
         for name in ("MediaPlayerEntityFeature", "MediaPlayerFeature"):
             flag = getattr(module, name, None)
@@ -130,7 +132,9 @@ async def _get_cover_bytes() -> "tuple[bytes, str] | None":
     return _cover_cache
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
+):
     coordinator = hass.data[DOMAIN][entry.entry_id]
     hostname = str(coordinator.host).replace(".", "_")
     entities: list = [
@@ -180,7 +184,6 @@ class _BasePlayer(MediaPlayerEntity, CoordinatorEntity):
             _LOGGER.info("media_player %s %d -> %s", self._side, self._port, command)
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("CEC %s failed: %s", command, err, exc_info=True)
-
 
 
 class _MediaInputPlayer(_BasePlayer):
@@ -285,9 +288,7 @@ class _MediaOutputPlayer(_BasePlayer):
 
     @property
     def source_list(self) -> list[str] | None:
-        return [
-            self.coordinator.input_display_name(i) for i in range(1, NUM_PORTS + 1)
-        ]
+        return [self.coordinator.input_display_name(i) for i in range(1, NUM_PORTS + 1)]
 
     @property
     def source(self) -> str | None:
@@ -300,9 +301,7 @@ class _MediaOutputPlayer(_BasePlayer):
         for i in range(1, NUM_PORTS + 1):
             if self.coordinator.input_display_name(i) == source:
                 await self.coordinator.set_route(self._port, i)
-                _LOGGER.info(
-                    "output %d select_source -> %s", self._port, source
-                )
+                _LOGGER.info("output %d select_source -> %s", self._port, source)
                 self.async_write_ha_state()
                 return
         _LOGGER.warning("output %d select_source: unknown %r", self._port, source)
