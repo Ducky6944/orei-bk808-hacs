@@ -102,7 +102,7 @@ cec_command:
 
 set_power:
   fields:
-    on:
+    "on":
       required: false
       default: true
       selector:

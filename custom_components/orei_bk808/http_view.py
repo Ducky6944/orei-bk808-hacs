@@ -9,6 +9,7 @@ Registered from `async_setup_entry` via `hass.http.register_view(...)` (the
 `http` integration is already an `after_dependency`, so `hass.http` exists).
 """
 
+import asyncio
 import mimetypes
 from pathlib import Path
 
@@ -39,9 +40,9 @@ class OreiCoverView(HomeAssistantView):
     requires_auth = False
     cors_allowed = True
 
-    def get(self, request: web.Request) -> web.Response:
+    async def get(self, request: web.Request) -> web.Response:
         try:
-            data = _STATIC.read_bytes()
+            data = await asyncio.to_thread(_STATIC.read_bytes)
         except OSError:
             return web.Response(status=404, text="cover not found")
         content_type = mimetypes.guess_type(_STATIC.name)[0] or "image/jpeg"

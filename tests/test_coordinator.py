@@ -25,6 +25,25 @@ def test_cec_output_commands_have_icons():
 
 
 @pytest.mark.asyncio
+async def test_port_status_read_api(hass):
+    """input_is_on / output_is_on default to off and reflect the status arrays."""
+    coord = OreiCoordinator(hass=hass, host="test.local")
+    assert coord.input_is_on(1) is False
+    assert coord.output_is_on(1) is False
+    assert coord.input_is_on(99) is False
+
+    # Simulate the parsed `get input status` / `get output status` arrays.
+    coord._input_active = [True, False, False, False, False, False, False, False]
+    coord._output_connect = [False, True, True, False, False, False, False, False]
+    assert coord.input_is_on(1) is True
+    assert coord.input_is_on(2) is False
+    assert coord.output_is_on(2) is True
+    assert coord.output_is_on(3) is True
+    assert coord.output_is_on(1) is False
+    await coord.shutdown()
+
+
+@pytest.mark.asyncio
 async def test_coordinator_initialization(hass):
     coord = OreiCoordinator(
         hass=hass,
