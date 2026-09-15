@@ -143,6 +143,14 @@ async def _validate(host: str) -> dict:
     # returning it regardless of `comhead`, so a GET may not have handed us
     # the input names. POST to /cgi-bin/instr reliably yields the specific
     # blob we ask for — use it for whichever name set is still missing.
+    #
+    # NOTE (sticky-socket interlock): this function finishes on a POST, which
+    # leaves the device latched on a NON-video blob right before setup runs.
+    # That's safe ONLY because the coordinator's initial read also POSTs (see
+    # coordinator._read_video_blob) to re-latch. If anyone ever makes setup
+    # read the routing state via GET, this trailing POST will make it fail
+    # with "device unreachable". Keep the two in step — the coordinator's
+    # comment cross-references this one.
     if not input_names:
         _merge(await _post("get input status"))
     if not output_names:

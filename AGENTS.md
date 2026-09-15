@@ -4,6 +4,28 @@ Guidance for any agent (or human) continuing work on this repository.
 Read this before making changes — it encodes constraints that are not
 obvious from the code alone.
 
+## How to work on this repo (read first)
+
+**Prefer the simple answer, and ask before you over-engineer.**
+
+- **Ask a clarifying question before increasing complexity.** One good
+  question ("should this be a toggle, just two fields, or a preset?") is
+  worth an afternoon of build-then-revert. Do not spend a huge number of
+  tokens to decide something the user can answer in one line.
+- **Simple > clever.** If a two-line fix, deleting an unused option, or a
+  single field does the job, do that. Do not add flags, wrappers, caches, or
+  abstractions to solve a one-spot problem. YAGNI.
+- **Prefer removing over adding.** Several real bugs here came from an
+  over-designed UI (a checkbox that silently overwrote typed input). When in
+  doubt, cut the moving part.
+- **State the plan in a sentence or two and check it works**, rather than
+  producing a long rationale. Short, concrete, verifiable — then stop.
+- **Verify with the real device / live test when the bug is behaviour**,
+  not just with unit stubs, before claiming a fix.
+
+If you're about to write a paragraph explaining *why* a particular design is
+reasonable, that's a signal to ask the user what they actually want instead.
+
 ## What this project is
 
 A HACS-ready Home Assistant custom integration for the **Orei BK808**, an
@@ -205,35 +227,58 @@ Toolchain is **black** + **flake8** — the exact two CI runs in
   (output-status blob). `config_flow._extract_names` accepts all three. Do
   **not** assume a single blob carries a given field.
 
-## Current state (v1.4.9 in preparation)
+## Verifying a behaviour fix against the real device
 
-- **v1.4.6 released** (tag `v1.4.6`): media-player `"on"`/`"off"` from live
-  port status; services.yaml `on` quoted; http_view + cover bytes made async;
-  dead `_stop` removed; stale `test_connection` string removed; README updated;
-  `test_media_player.py` + `pytest.ini` + `AGENTS.md` added.
-- **v1.4.7 released** (tag `v1.4.7`): lint pass — whole repo through `black`
-  (88-col), added `.flake8` to match, removed unused `NUM_PORTS` import,
-  tightened a long conftest docstring; added `pytest-cov` to CI.
-- **v1.4.8 released** (tag `v1.4.8`): fixed cover regression
-  (`async_get_media_image` was returning an un-awaited coroutine → now
-  `await`ed) and first pass at the naming trap.
-- **v1.4.9 (this):** fixed the two problems the user reported on top of v1.4.8.
+These bugs are all about a *living device*, so unit tests alone don't prove a
+fix. Cheap, direct probes (no HA/hass needed) are the fastest way to confirm:
+
+```python
+# one-off: reach the matrix straight, print what each comhead actually returns
+import asyncio, json, aiohttp, ssl
+HOST = "192.168.1.100"                      # or the DNS name
+cx = ssl.create_default_context(); cx.check_hostname = False; cx.verify_mode = ssl.CERT_NONE
+async def post(s, ch):
+    async with s.post(f"https://{HOST}/cgi-bin/instr", json={"comhead": ch, "language": 0},
+                      headers={"Content-Type": "application/json", "Accept": "application/json"},
+                      timeout=aiohttp.ClientTimeout(total=10)) as r: return json.loads(await r.text())
+async def get(s, ch):
+    async with s.get(f"https://{HOST}/cgi-bin/query", params={"comhead": ch},
+                     timeout=aiohttp.ClientTimeout(total=10)) as r: return json.loads(await r.text())
+async def main():
+    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=cx)) as s:
+        # latches a NON-video blob, then check the video read recovers:
+        await post(s, "get input status"); await post(s, "get output status")
+        print("GET  video:", "allsource" in await get(s, "get video status"), "(may be False!)")
+        print("POST video:", "allsource" in await post(s, "get video status"), "(should be True)")
+asyncio.run(main())
+```
+
+If **GET video = False / POST video = True**, the sticky-latch bug is present
+(or, after the v1.4.9 fix, that's exactly why the coordinator must POST).
+The repo's `test_live_setup_recovers` is the same check through the real
+coordinator (skipped by default — run with
+`OROE_LIVE_HOST=<ip> python -m pytest -k live_setup -s`).
+
+## Current state (v1.5.0 — awaiting user verification)
+
+- **v1.4.9 released** (tag `v1.4.9`): the two reported bugs —
   1. *Setup failed: "device is unreachable / All state queries failed".*
-     Root cause was the sticky socket: the config flow ends by POSTing
-     `get input/output status`, latching the device on a non-video blob, and the
-     coordinator's **GET** `get video status` read stayed latched (no
-     `allsource`) and raised `ConfigEntryNotReady`. **Fix:**
-     `coordinator._read_video_blob()` now **POSTs** `get video status` (which
-     re-latches reliably), GET only as a fallback. Verified live: POST recovers
-     the video blob 4/4 from a bad latch; GET does not. Added a (skipped-by-
-     default) live guard `test_live_setup_recovers`.
+     Sticky-socket cause: the config flow ends on a POST that latches a non-video
+     blob; the coordinator's GET read stayed latched and raised
+     `ConfigEntryNotReady`. **Fix:** `coordinator._read_video_blob()` now POSTs
+     `get video status` (reliable re-latch), GET only as a fallback.
   2. *Config naming checkbox always looked unchecked / ignored edits.*
-     **Fix:** removed the `use_device_names` checkbox from the setup flow
-     entirely; the input/output text fields are now always pre-filled with the
-     device's names and are the sole source of truth. (`_validate` now reads
-     names from any blob — `allinputname`/`inname`/`name`/`alloutputname` —
-     and falls back to POST for any the sticky GET latched away.)
-  Gates green: 11 pytest tests pass (+1 live guard skipped by default),
-  `black --check` clean, `flake8` clean, `compileall` clean, and
-  `_validate` confirmed to extract **both** input and output names from a live
-  device.
+     **Fix:** removed the `use_device_names` checkbox; the input/output text
+     fields are pre-filled with the device names and are the sole source of
+     truth. `_validate` reads names from any blob and falls back to POST.
+  - Added cross-referencing comments between `_validate` and
+    `_read_video_blob` so neither gets "cleaned up" into re-introducing the
+    sticky-latch failure.
+- **v1.5.0 (this):** docs + guard-rail comments only — added the "How to work
+  on this repo", "Verifying a behaviour fix", and the interlock comments.
+- **⚠️ NOT YET VERIFIED BY THE USER.** v1.4.9/v1.5.0 fixes were confirmed with
+  local direct-device probes, but the user has not done a full setup → use pass
+  in Home Assistant yet. Until they confirm: treat the setup-failure and
+  cover/naming fixes as *hypotheses that pass our probes*, not as proven.
+  If they report a repro, start with the probes above and the `coordinator` /
+  `http_view` trace in the HA logs before changing code.
