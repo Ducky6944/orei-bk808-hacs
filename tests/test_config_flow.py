@@ -3,7 +3,6 @@
 import pytest
 from unittest.mock import patch
 
-from homeassistant import data_entry_flow
 from homeassistant.config_entries import SOURCE_USER
 from custom_components.orei_bk808.const import DOMAIN, CONF_HOST
 
@@ -18,7 +17,7 @@ SAMPLE = {
 
 
 @pytest.mark.asyncio
-async def test_successful_setup(hass):
+async def test_successful_setup(hass, enable_custom_integrations):
     """Happy path: show form, accept host, create entry."""
 
     async def _validate(host):
@@ -31,13 +30,21 @@ async def test_successful_setup(hass):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": SOURCE_USER}
         )
-        assert result["type"] == data_entry_flow.RESULT_TYPE_FORM
+        assert result["type"] == "form"
         assert result["step_id"] == "user"
 
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], user_input={CONF_HOST: "192.168.1.100"}
         )
-        assert result["type"] == data_entry_flow.RESULT_TYPE_CREATE_ENTRY
+        # The flow pauses at the (pre-filled) naming step.
+        assert result["type"] == "form"
+        assert result["step_id"] == "naming"
+
+        # Accept the device-reported names as-is and finish.
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={"use_device_names": True}
+        )
+        assert result["type"] == "create_entry"
         assert result["title"] == "192.168.1.100"
         assert result["data"]["host"] == "192.168.1.100"
         assert result["data"]["input_names"][0] == "A"
@@ -45,7 +52,7 @@ async def test_successful_setup(hass):
 
 
 @pytest.mark.asyncio
-async def test_connection_failed(hass):
+async def test_connection_failed(hass, enable_custom_integrations):
     """Unreachable host surfaces a `cannot_connect` error."""
     import aiohttp
 
@@ -61,5 +68,5 @@ async def test_connection_failed(hass):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], user_input={CONF_HOST: "192.168.1.100"}
         )
-        assert result["type"] == data_entry_flow.RESULT_TYPE_FORM
+        assert result["type"] == "form"
         assert result["errors"]["base"] == "cannot_connect"

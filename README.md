@@ -12,7 +12,7 @@ A fully-featured Home Assistant integration for the Orei BK808 8x8 HDMI Matrix S
 ## ✨ Features
 
 - 🚀 **GUI setup wizard** with automatic connection testing (no login needed)
-- 📺 **Native HA media players** — one per port, works with standard media-player cards (play/pause/volume/power, and per-output *input source* = routing)
+- 📺 **Native HA media players** — one per port, works with standard media-player cards (play/pause/volume/power, and per-output *input source* = routing). Each player reports the port's real power state (`on`/`off`) from the matrix's own status, so history and automations see when a device actually switches on/off
 - 🎮 **Full CEC control** for all inputs and outputs (device-mapped command indices)
 - 🔄 **8×8 routing matrix** — route any input to any output
 - ⚡ **Preset save/recall/rename** for instant scene switching
@@ -29,6 +29,16 @@ A fully-featured Home Assistant integration for the Orei BK808 8x8 HDMI Matrix S
 - Home Assistant 2024.1 or later
 - HACS installed (recommended)
 - Your Orei BK808 connected to your network via Ethernet
+
+## 💡 What media-player means for a matrix
+
+A matrix switch doesn't "play" media — it routes signals and issues CEC frames. So this integration models each port as a media player for UI convenience, where:
+
+- **State** (`on`/`off`) = the matrix's own live power / connection status for that port (`inactive[]` for sources, `allconnect[]` for sinks). Polled every 5s.
+- **Media controls** (play/pause/volume/mute/power) = CEC commands forwarded to that port's device.
+- **Input source** (on the output players) = routing the chosen input to that output.
+
+That's what you'd expect from "play a PS5 through the Living Room AVR" — but the matrix itself doesn't track what's playing.
 
 ## 🚀 Installation
 
@@ -74,8 +84,8 @@ Command indices are the device-specific values extracted from the BK808's own we
 
 | Entity | What It Does |
 |--------|--------------|
-| `media_player.output_<N>` | A **sink** (display/AVR) on output N. **Input source** = route that input to this output. Plus CEC play / next / previous / volume / mute / power. |
-| `media_player.input_<N>` | The **source device** on input N. Transport (play / pause / stop / next / prev), volume up/down/mute, and power on/off — all CEC. |
+| `media_player.output_<N>` | A **sink** (display/AVR) on output N. **Input source** = route that input to this output. Plus CEC play / next / previous / volume / mute / power. State reflects the sink's live connection status (`on`/`off`). |
+| `media_player.input_<N>` | The **source device** on input N. Transport (play / pause / stop / next / prev), volume up/down/mute, and power on/off — all CEC. State reflects the source's live power status (`on` when powered, `off` when not). |
 | `switch.matrix_power` | Whole-matrix power (standby). |
 | `switch.output_<N>_mute` | HDMI audio mute per output. |
 | `select.output_<N>_route` | Pure routing dropdown (input → output). |

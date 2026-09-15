@@ -11,6 +11,7 @@ This is what lets you replace the wall of buttons with one media-player
 card per port — HA's native media controls just work.
 """
 
+import asyncio
 import logging
 from pathlib import Path
 
@@ -74,7 +75,15 @@ MediaPlayerFeature = _resolve_feature_flag()
 
 # Media-player states as plain strings (the exact values HA expects) — avoids a
 # hard dependency on the MediaPlayerState enum, which also moved across builds.
-_STATE_IDLE = "idle"
+#
+# The matrix reports *power/connection* per port (`inactive` for sources,
+# `allconnect` for sinks) but not active playback — it routes signals, it
+# doesn't decode them. So the truest state we can advertise is:
+#   port powered/connected  -> "on"
+#   port powered off        -> "off"
+# (`"playing"` would be a lie; `"on"` is the canonical HA state for
+#  powered-but-not-playing-a-known-item.)
+_STATE_ON = "on"
 _STATE_OFF = "off"
 
 
@@ -102,15 +111,22 @@ _cover_cache: "tuple[bytes, str] | None" = None
 _cover_cache_loaded = False
 
 
-def _get_cover_bytes() -> "tuple[bytes, str] | None":
+def _read_cover_sync() -> "tuple[bytes, str] | None":
+    """Blocking read — always run via `asyncio.to_thread` from the event loop."""
+    path = Path(__file__).parent / "static" / "cover.jpg"
+    try:
+        return (path.read_bytes(), "image/jpeg")
+    except OSError as err:
+        _LOGGER.warning("Could not read bundled cover art: %s", err)
+        return None
+
+
+async def _get_cover_bytes() -> "tuple[bytes, str] | None":
+    """Return cached cover bytes, loading off the event loop on first hit."""
     global _cover_cache, _cover_cache_loaded
     if not _cover_cache_loaded:
         _cover_cache_loaded = True
-        try:
-            path = Path(__file__).parent / "static" / "cover.jpg"
-            _cover_cache = (path.read_bytes(), "image/jpeg")
-        except OSError as err:
-            _LOGGER.warning("Could not read bundled cover art: %s", err)
+        _cover_cache = await asyncio.to_thread(_read_cover_sync)
     return _cover_cache
 
 
@@ -133,7 +149,6 @@ class _BasePlayer(MediaPlayerEntity, CoordinatorEntity):
         super().__init__(coordinator)
         self._side = side
         self._port = port
-        self._hostname = hostname
         # A non-None media_image_url tells the frontend to request the image
         # (via media_player_proxy). The actual bytes are returned by our
         # async_get_media_image override below — no network fetch of self.
@@ -193,10 +208,10 @@ class _MediaInputPlayer(_BasePlayer):
     @property
     def state(self) -> str | None:
         # The device reports whether the *source* on this input is powered/on
-        # (`inactive`=1) but not playback, so we can only say idle (on, playing
-        # or standby) vs off. This is what actually lights up the history —
-        # routing alone left every port "idle" forever.
-        return _STATE_IDLE if self.coordinator.input_is_on(self._port) else _STATE_OFF
+        # (`inactive`=1) but not playback — so "on" (powered) vs off. This is
+        # what actually lights up the history; routing alone left every port
+        # "idle" forever.
+        return _STATE_ON if self.coordinator.input_is_on(self._port) else _STATE_OFF
 
     @property
     def is_on(self) -> bool | None:
@@ -261,8 +276,8 @@ class _MediaOutputPlayer(_BasePlayer):
     @property
     def state(self) -> str | None:
         # The device reports whether the *sink* on this output is connected/on
-        # (`allconnect`=1) but not playback — so idle (on) vs off, not routing.
-        return _STATE_IDLE if self.coordinator.output_is_on(self._port) else _STATE_OFF
+        # (`allconnect`=1) but not playback — so "on" (powered) vs off, not routing.
+        return _STATE_ON if self.coordinator.output_is_on(self._port) else _STATE_OFF
 
     @property
     def is_on(self) -> bool | None:

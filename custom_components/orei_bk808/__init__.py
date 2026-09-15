@@ -199,9 +199,6 @@ def _register_services(hass: HomeAssistant) -> None:
         for coord in hass.data[DOMAIN].values():
             await coord.async_request_refresh()
 
-    async def _stop(_call: ServiceCall) -> None:
-        pass
-
     services: dict = {
         "route": (
             vol.Schema(

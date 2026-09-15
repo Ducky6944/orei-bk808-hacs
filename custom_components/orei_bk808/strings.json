@@ -8,10 +8,6 @@
           "host": "Host IP Address"
         }
       },
-      "test_connection": {
-        "title": "Connection Failed",
-        "description": "Could not reach the matrix. Check IP and power."
-      },
       "naming": {
         "title": "Connection Successful!",
         "description": "Device found. Customize input/output names (optional).",
