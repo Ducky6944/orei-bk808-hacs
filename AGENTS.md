@@ -20,6 +20,10 @@ obvious from the code alone.
   doubt, cut the moving part.
 - **State the plan in a sentence or two and check it works**, rather than
   producing a long rationale. Short, concrete, verifiable — then stop.
+- **Stop debating with yourself after 2–3 turns.** If you find yourself going
+  back and forth on which path to take more than two or three times, ask the
+  user what they think instead of endlessly deliberating. If they have no
+  preference, that's fine — pick one and go.
 - **Verify with the real device / live test when the bug is behaviour**,
   not just with unit stubs, before claiming a fix.
 
@@ -145,7 +149,12 @@ Toolchain is **black** + **flake8** — the exact two CI runs in
 
 1. Run the full lint & quality gate (see above): `pytest` + `black --check`
    + `flake8` + `compileall`, all clean.
-2. Bump `"version"` in `custom_components/orei_bk808/manifest.json`.
+2. Bump `"version"` in `custom_components/orei_bk808/manifest.json` — **but
+   only for code changes** that reach into `custom_components/`. Docs-only
+   edits (README, AGENTS.md, release notes, workflow YAML) carry no bearing on
+   the released integration: just commit, no version bump, no new tag or
+   `gh release`. Keep `manifest.json`, the git tag, and the GitHub release
+   version in lockstep at all times.
 3. `git add -A && git commit -m "vX.Y.Z: <summary>"`.
 4. `git tag vX.Y.Z`, `git push origin <branch> --follow-tags`
    (repo: `https://github.com/Ducky6944/orei-bk808-hacs.git`).
