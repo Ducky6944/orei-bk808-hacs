@@ -268,7 +268,7 @@ The repo's `test_live_setup_recovers` is the same check through the real
 coordinator (skipped by default — run with
 `OROE_LIVE_HOST=<ip> python -m pytest -k live_setup -s`).
 
-## Current state (v1.5.0 — awaiting user verification)
+## Current state (v1.5.0 — ✅ verified working by user in Home Assistant)
 
 - **v1.4.9 released** (tag `v1.4.9`): the two reported bugs —
   1. *Setup failed: "device is unreachable / All state queries failed".*
@@ -285,9 +285,7 @@ coordinator (skipped by default — run with
     sticky-latch failure.
 - **v1.5.0 (this):** docs + guard-rail comments only — added the "How to work
   on this repo", "Verifying a behaviour fix", and the interlock comments.
-- **⚠️ NOT YET VERIFIED BY THE USER.** v1.4.9/v1.5.0 fixes were confirmed with
-  local direct-device probes, but the user has not done a full setup → use pass
-  in Home Assistant yet. Until they confirm: treat the setup-failure and
-  cover/naming fixes as *hypotheses that pass our probes*, not as proven.
-  If they report a repro, start with the probes above and the `coordinator` /
-  `http_view` trace in the HA logs before changing code.
+- **✅ VERIFIED BY THE USER.** Full setup → use in Home Assistant confirmed
+  working (v1.4.9 fixes: setup failure, cover art, naming all good).
+  If a repro ever comes back, start with the probes above and the
+  `coordinator` / `http_view` trace in the HA logs before changing code.
