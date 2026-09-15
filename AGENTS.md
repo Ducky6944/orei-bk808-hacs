@@ -53,9 +53,16 @@ re-add it.
   single connection return correct bodies. Do not open a new session per call
   and do not reuse one connection for concurrent requests.
 - **Read status**: `POST /cgi-bin/instr` body `{"comhead": "..."}`.
-  - `get input status`  -> `inactive[]`  (1 = powered on, 0 = off)
-  - `get output status` -> `allconnect[]` (1 = something connected, 0 = off)
-  - video / CEC status read via the coordinator's existing poll.
+  - `get input status`  -> `inactive[]`  (1 = powered on, 0 = off),
+    plus `inname[]` (input port names).
+  - `get output status` -> `allconnect[]` (1 = something connected, 0 = off),
+    plus `name[]` (output port names).
+  - `get video status`  -> `allsource[]` (routing: which input sits on each
+    output), plus `allinputname[]` / `alloutputname[]`.
+  - **Names live in different fields per blob.** To reliably read the user's
+    configured port names you must accept **all** of: `allinputname`,
+    `inname`, `name`, `alloutputname`. `config_flow._extract_names` does this;
+    reuse it rather than assuming one field.
 - **Command**: `POST /cgi-bin/instr` body `{"comhead": "<command>"}`.
 
 Key consequence: the device does **not** report "which video is playing" —
@@ -132,22 +139,66 @@ Toolchain is **black** + **flake8** — the exact two CI runs in
 - **`enable_custom_integrations` fixture.** Config-flow tests need this
   fixture (from `pytest-homeassistant-custom-component`) to clear the
   loader cache.
-- **Cover bytes.** `async_get_media_image()` and the `http_view` handler
-  both call `asyncio.to_thread(...)` to read bundled asset bytes. A plain
-  sync call in async code blocks the loop / trips
-  `AssertionError: Handler should be a coroutine or a callback`.
-- **`async def` for HA HTTP handlers.** `http_view` handler must be
-  `async def`, not a plain function.
+- **Cover bytes.** The bundled cover is read off the event loop via
+  `asyncio.to_thread(_read_cover_sync)` in `media_player.py` and
+  `asyncio.to_thread(_STATIC.read_bytes)` in `http_view.py`. A plain sync
+  `read_bytes` in an async context works but blocks; keep the `to_thread`.
+- **HOW THE MEDIA-PLAYER COVER ACTUALLY GETS TO THE CARD.** This is the one
+  that bit us in v1.4.6 — read it carefully:
+  The frontend media-control card does **not** load `media_image_url` as a
+  plain `<img>`. It calls the server-side `media_player_proxy`
+  (`/api/media_player_proxy/{entity_id}`), which runs
+  `player.async_get_media_image()` and expects it to **return a
+  `(bytes, content_type)` tuple**. Our `http_view` route
+  (`/local/orei_bk808/cover.jpg`) is a *separate* direct-URL fallback, not the
+  primary path. So if `async_get_media_image` ever returns a coroutine (see
+  below), the card silently shows the placeholder and you get NO console
+  error — just a blank cover.
+- **Awaiting async helpers (the v1.4.6 regression).** `_get_cover_bytes()`
+  became `async` in v1.4.6, but its call site in
+  `async_get_media_image` was left as `cov = _get_cover_bytes()` — i.e. an
+  **un-awaited coroutine**. A coroutine is never `None`, so the
+  `if cov is None` guard passed, the coroutine was returned up to the proxy,
+  and `data, content_type = <coroutine>` raised
+  `TypeError: cannot unpack non-iterable coroutine object` → HTTP 500 →
+  placeholder cover. **Rule:** whenever you turn a helper async, update every
+  call site to `await`. Verify the cover with
+  `result = await player.async_get_media_image(); assert isinstance(result, tuple)`.
+- **`async def` for HA HTTP handlers.** If you add more `HomeAssistantView`
+  handlers, they must be `async def` (a sync handler trips
+  `AssertionError: Handler should be a coroutine or a callback`).
+- **Config-flow name pre-fill trap.** `async_step_naming` defaulted
+  `use_device_names` to `True` whenever the device reported *any* port name,
+  which **silently discarded the user's typed names** (and the sticky device
+  sometimes returns name-less blobs, making it non-deterministic — "several
+  attempts"). It now defaults to `False` and pre-fills the text fields with
+  the device names, so typed values are authoritative. If you touch this, keep
+  the text fields as the source of truth and treat `use_device_names` as an
+  explicit opt-in to re-pull device names verbatim.
+- **The BK808 is a sticky single-connection device** and the field names
+  differ per response blob: names arrive as `allinputname`/`alloutputname`
+  (video-status blob) *or* `inname` (input-status blob) *or* `name`
+  (output-status blob). `config_flow._extract_names` accepts all three. Do
+  **not** assume a single blob carries a given field.
 
-## Current state (v1.4.7 in preparation)
+## Current state (v1.4.8 in preparation)
 
-- **v1.4.6 is released** (tag `v1.4.6`): media-player state now `"on"`/`"off"`
-  from real port status; services.yaml `on` quoted; http_view + cover bytes
-  made async; dead `_stop` handler removed; stale `test_connection` string
-  removed; README + entity tables updated; `test_media_player.py` + `pytest.ini`
-  added; `AGENTS.md` added.
-- **Lint hardened (v1.4.7):** ran the whole codebase through `black` (13 files
-  reformatted to 88-col), added `.flake8` so flake8 matches black, fixed a
-  stray unused `NUM_PORTS` import, tightened a long docstring in conftest.
-  All gates green: 9 pytest tests pass, `black --check` clean, `flake8` clean
-  (custom_components + tests).
+- **v1.4.6 released** (tag `v1.4.6`): media-player `"on"`/`"off"` from live
+  port status; services.yaml `on` quoted; http_view + cover bytes made async;
+  dead `_stop` removed; stale `test_connection` string removed; README updated;
+  `test_media_player.py` + `pytest.ini` + `AGENTS.md` added.
+- **v1.4.7 released** (tag `v1.4.7`): lint pass — whole repo through `black`
+  (88-col), added `.flake8` to match, removed unused `NUM_PORTS` import,
+  tightened a long conftest docstring; added `pytest-cov` to CI.
+- **v1.4.8 (this):** fixed two regressions the user reported.
+  1. *Cover art blank* (v1.4.6 regression): `async_get_media_image` was
+     returning an un-awaited coroutine of `_get_cover_bytes()`. Now `await`ed;
+     added `test_media_image_returns_bytes_not_coroutine`.
+  2. *Naming took several attempts* (config-flow trap): `use_device_names`
+     defaulted to `True` and clobbered typed names. Now defaults to `False`
+     with the fields pre-filled from the (now-robust) `_validate`;
+     `_validate` reads names from *any* device blob (`allinputname`/`inname`/
+     `name`) and treats reachability as success. Added
+     `test_typed_names_are_respected`.
+  Gates green: 11 pytest tests pass, `black --check` clean, `flake8` clean,
+  `compileall` clean.

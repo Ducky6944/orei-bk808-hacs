@@ -169,7 +169,7 @@ class _BasePlayer(MediaPlayerEntity, CoordinatorEntity):
         Uses a module-level cache so the 472 KB file is read at most once
         per Home Assistant process, shared by all 16 players.
         """
-        cov = _get_cover_bytes()
+        cov = await _get_cover_bytes()
         if cov is None:
             return None, None
         return cov

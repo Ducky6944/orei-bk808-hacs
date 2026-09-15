@@ -10,6 +10,23 @@ from custom_components.orei_bk808.media_player import (
 
 
 @pytest.mark.asyncio
+async def test_media_image_returns_bytes_not_coroutine(hass):
+    """async_get_media_image must yield (bytes, content_type), never a raw
+    coroutine — that was the cover-art regression (HA can't unpack a
+    coroutine and returns 500, so cards showed the placeholder)."""
+    coord = OreiCoordinator(hass=hass, host="test.local")
+    player = _MediaInputPlayer(coord, 1, "test_local")
+    result = await player.async_get_media_image()
+    assert not (
+        hasattr(result, "send") and not isinstance(result, (tuple, list))
+    ), "expected a (bytes, str) tuple, got an un-awaited coroutine"
+    data, ctype = result
+    assert isinstance(data, (bytes, bytearray)) and len(data) > 0
+    assert ctype == "image/jpeg"
+    await coord.shutdown()
+
+
+@pytest.mark.asyncio
 async def test_input_player_reports_on_or_off(hass):
     coord = OreiCoordinator(hass=hass, host="test.local")
     # Default: nothing powered -> off.
