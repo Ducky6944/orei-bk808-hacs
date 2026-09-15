@@ -80,6 +80,10 @@ read back.
   commands, then requests a coordinator refresh.
 - All reads go through the coordinator; entities must NOT open their own
   HTTP connections.
+- **Reads are POSTs, not GETs.** Because of the sticky socket (see gotchas),
+  the routing/blob state is read via `send_command(...)` (POST `/cgi-bin/instr`),
+  wrapped by `_read_video_blob()`. GET is only a fallback. If you add a new
+  state read, POST it.
 
 ## Conventions
 
@@ -128,6 +132,24 @@ Toolchain is **black** + **flake8** — the exact two CI runs in
 
 ## Known gotchas (all hit and fixed — do not regress)
 
+- **STICKY SOCKET + GET/POST asymmetry (the #1 trap, caused the "device is
+  unreachable" setup failure).** The BK808 is a sticky single-connection
+  device: it latches the payload it last generated and keeps returning it
+  **regardless of the `comhead` you ask for**. And the transport matters:
+  a **GET** `/cgi-bin/query` serves the latched blob and does *not* re-latch,
+  but a **POST** `/cgi-bin/instr` **re-latches** the device onto the requested
+  `comhead`. Consequence: whatever your *first* call asks for becomes sticky
+  for subsequent GETs.
+  - This is why setup used to fail: the config flow ends by POSTing
+    `get input status` / `get output status`, leaving the socket latched on a
+    non-video blob; the coordinator then did a **GET** `get video status`,
+    which stayed latched → never saw `allsource` → `UpdateFailed: All state
+    queries failed` → `ConfigEntryNotReady: … unreachable`. **Fix:** read the
+    state via **POST** — `coordinator._read_video_blob()` POSTs
+    `get video status` first (reliable re-latch), only falling back to GET.
+    Rule: **any read of the routing/blob state must POST, not GET.**
+  - It is also why the *names* field differs per blob (`allinputname` vs
+    `inname` vs `name`) — see the next bullet.
 - **YAML `on` key.** In `services.yaml`, `on:` parses as boolean `True`
   under YAML 1.1. The field must be quoted: `"on":`. Symptom of a
   regression: `expected str at 'set_power.fields[True]'`.
@@ -167,21 +189,23 @@ Toolchain is **black** + **flake8** — the exact two CI runs in
 - **`async def` for HA HTTP handlers.** If you add more `HomeAssistantView`
   handlers, they must be `async def` (a sync handler trips
   `AssertionError: Handler should be a coroutine or a callback`).
-- **Config-flow name pre-fill trap.** `async_step_naming` defaulted
-  `use_device_names` to `True` whenever the device reported *any* port name,
-  which **silently discarded the user's typed names** (and the sticky device
-  sometimes returns name-less blobs, making it non-deterministic — "several
-  attempts"). It now defaults to `False` and pre-fills the text fields with
-  the device names, so typed values are authoritative. If you touch this, keep
-  the text fields as the source of truth and treat `use_device_names` as an
-  explicit opt-in to re-pull device names verbatim.
+- **Config-flow name pre-fill trap.** `async_step_naming` *used to* have a
+  `use_device_names` checkbox that defaulted to `True` whenever the device
+  reported any name — silently discarding the user's typed names (and the
+  sticky device sometimes returned name-less blobs, making it
+  non-deterministic — "several attempts"). It then defaulted to `False`,
+  which made the box "always look unchecked". **Final fix:** the checkbox is
+  *gone*; the two text fields are always pre-filled with the device's names
+  and are the single source of truth (do nothing → device names; edit →
+  yours). If you add a toggle back, default it OFF and keep the text fields
+  authoritative.
 - **The BK808 is a sticky single-connection device** and the field names
   differ per response blob: names arrive as `allinputname`/`alloutputname`
   (video-status blob) *or* `inname` (input-status blob) *or* `name`
   (output-status blob). `config_flow._extract_names` accepts all three. Do
   **not** assume a single blob carries a given field.
 
-## Current state (v1.4.8 in preparation)
+## Current state (v1.4.9 in preparation)
 
 - **v1.4.6 released** (tag `v1.4.6`): media-player `"on"`/`"off"` from live
   port status; services.yaml `on` quoted; http_view + cover bytes made async;
@@ -190,15 +214,26 @@ Toolchain is **black** + **flake8** — the exact two CI runs in
 - **v1.4.7 released** (tag `v1.4.7`): lint pass — whole repo through `black`
   (88-col), added `.flake8` to match, removed unused `NUM_PORTS` import,
   tightened a long conftest docstring; added `pytest-cov` to CI.
-- **v1.4.8 (this):** fixed two regressions the user reported.
-  1. *Cover art blank* (v1.4.6 regression): `async_get_media_image` was
-     returning an un-awaited coroutine of `_get_cover_bytes()`. Now `await`ed;
-     added `test_media_image_returns_bytes_not_coroutine`.
-  2. *Naming took several attempts* (config-flow trap): `use_device_names`
-     defaulted to `True` and clobbered typed names. Now defaults to `False`
-     with the fields pre-filled from the (now-robust) `_validate`;
-     `_validate` reads names from *any* device blob (`allinputname`/`inname`/
-     `name`) and treats reachability as success. Added
-     `test_typed_names_are_respected`.
-  Gates green: 11 pytest tests pass, `black --check` clean, `flake8` clean,
-  `compileall` clean.
+- **v1.4.8 released** (tag `v1.4.8`): fixed cover regression
+  (`async_get_media_image` was returning an un-awaited coroutine → now
+  `await`ed) and first pass at the naming trap.
+- **v1.4.9 (this):** fixed the two problems the user reported on top of v1.4.8.
+  1. *Setup failed: "device is unreachable / All state queries failed".*
+     Root cause was the sticky socket: the config flow ends by POSTing
+     `get input/output status`, latching the device on a non-video blob, and the
+     coordinator's **GET** `get video status` read stayed latched (no
+     `allsource`) and raised `ConfigEntryNotReady`. **Fix:**
+     `coordinator._read_video_blob()` now **POSTs** `get video status` (which
+     re-latches reliably), GET only as a fallback. Verified live: POST recovers
+     the video blob 4/4 from a bad latch; GET does not. Added a (skipped-by-
+     default) live guard `test_live_setup_recovers`.
+  2. *Config naming checkbox always looked unchecked / ignored edits.*
+     **Fix:** removed the `use_device_names` checkbox from the setup flow
+     entirely; the input/output text fields are now always pre-filled with the
+     device's names and are the sole source of truth. (`_validate` now reads
+     names from any blob — `allinputname`/`inname`/`name`/`alloutputname` —
+     and falls back to POST for any the sticky GET latched away.)
+  Gates green: 11 pytest tests pass (+1 live guard skipped by default),
+  `black --check` clean, `flake8` clean, `compileall` clean, and
+  `_validate` confirmed to extract **both** input and output names from a live
+  device.
