@@ -63,6 +63,8 @@ class OreiCoordinator(DataUpdateCoordinator):
         # output sink connection (`allconnect`: 1=on). Backs media_player state.
         self._input_active: List[bool] = [False] * NUM_PORTS
         self._output_connect: List[bool] = [False] * NUM_PORTS
+        # `get status` blob: carries `version` / `webversion` (firmware) and power.
+        self._status_state: Dict[str, Any] = {}
         self._last_error: Optional[BaseException] = None
 
         self._session: Optional[aiohttp.ClientSession] = None
@@ -279,9 +281,24 @@ class OreiCoordinator(DataUpdateCoordinator):
         except (aiohttp.ClientError, aiohttp.ServerTimeoutError) as err:
             _LOGGER.debug("get output status failed (%r); keeping last-known", err)
 
+    async def _fetch_status(self) -> None:
+        """Read device status (firmware web/UI versions, power, hostname).
+
+        This is the blob that carries `version` / `webversion`. Optional —
+        a transient failure just leaves the last-known value (same leniency
+        as `_fetch_port_status`).
+        """
+        try:
+            body = await self.send_command("get status")
+            if isinstance(body, dict) and body.get("version"):
+                self._status_state = body
+        except (aiohttp.ClientError, aiohttp.ServerTimeoutError) as err:
+            _LOGGER.debug("get status failed (%r); keeping last-known", err)
+
     async def _async_update_data(self) -> Dict[str, Any]:
         video_ok = await self._fetch_states()
         await self._fetch_port_status()
+        await self._fetch_status()
 
         # First-ever poll with no usable state is a real outage.
         if not video_ok and not self._video_state and not self._cec_state:
@@ -324,7 +341,17 @@ class OreiCoordinator(DataUpdateCoordinator):
             return bool(self._video_state["power"])
         if "power" in self._cec_state:
             return bool(self._cec_state["power"])
+        if "power" in self._status_state:
+            return bool(self._status_state["power"])
         return None
+
+    def get_firmware(self) -> Optional[str]:
+        """Firmware string as the web UI shows it: `version/webversion`."""
+        ver = self._status_state.get("version")
+        if not ver:
+            return None
+        web = self._status_state.get("webversion")
+        return f"{ver}/{web}" if web else str(ver)
 
     def input_is_on(self, input_num: int) -> bool:
         """True if the *source* on this input is powered/on (`inactive`=1)."""

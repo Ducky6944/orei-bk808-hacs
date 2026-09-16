@@ -73,7 +73,7 @@ class FirmwareSensor(SensorEntity, CoordinatorEntity):
 
     @property
     def native_value(self) -> str | None:
-        return self.coordinator._video_state.get("version")
+        return self.coordinator.get_firmware()
 
 
 class OutputRoutedInputSensor(SensorEntity, CoordinatorEntity):

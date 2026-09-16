@@ -63,6 +63,17 @@ async def test_coordinator_initialization(hass):
     await coord.shutdown()
 
 
+@pytest.mark.asyncio
+async def test_firmware_string(hass):
+    coord = OreiCoordinator(hass=hass, host="test.local")
+    assert coord.get_firmware() is None
+    coord._status_state = {"version": "V1.10.03", "webversion": "V2.00.03"}
+    assert coord.get_firmware() == "V1.10.03/V2.00.03"
+    coord._status_state = {"version": "V1.10.03"}
+    assert coord.get_firmware() == "V1.10.03"
+    await coord.shutdown()
+
+
 @pytest.mark.skipif(True, reason="live guard — run manually with OROE_LIVE_HOST=<ip>")
 async def test_live_setup_recovers(hass):
     """Local-only guard for the sticky-latch setup bug (see _read_video_blob).
