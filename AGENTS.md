@@ -268,7 +268,7 @@ The repo's `test_live_setup_recovers` is the same check through the real
 coordinator (skipped by default — run with
 `OROE_LIVE_HOST=<ip> python -m pytest -k live_setup -s`).
 
-## Current state (v1.5.1 — awaiting user verification)
+## Current state (v1.5.2 — awaiting user verification)
 
 - **v1.4.9 released** (tag `v1.4.9`): the two reported bugs —
   1. *Setup failed: "device is unreachable / All state queries failed".*
@@ -283,7 +283,11 @@ coordinator (skipped by default — run with
   - Added cross-referencing comments between `_validate` and
     `_read_video_blob` so neither gets "cleaned up" into re-introducing the
     sticky-latch failure.
-- **v1.5.1 (this):** firmware sensor fix — `sensor.firmware` was `unknown`
+- **v1.5.2 (this):** loop button entities had no icon — `mdi:loop` is not a
+  valid Material Design icon. Now `mdi:repeat` (both CEC tables in `const.py`).
+  Gotcha: an **invalid `mdi:` name renders as a blank icon with no error** —
+  if an entity has no icon, suspect the name first.
+- **v1.5.1:** firmware sensor fix — `sensor.firmware` was `unknown`
   because `version`/`webversion` live in the `get status` blob, which the
   coordinator never fetched. `coordinator._fetch_status()` now POSTs
   `get status`, and `get_firmware()` returns `version/webversion` (as the
