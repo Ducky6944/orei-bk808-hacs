@@ -163,8 +163,9 @@ class _BasePlayer(MediaPlayerEntity, CoordinatorEntity):
 
         The stock implementation (see homeassistant/components/media_player/__init__.py)
         re-fetches `media_image_url` over HTTP on the server side, which breaks
-        behind a reverse proxy (the self-request can't round-trip to
-        `ha.local.example.com`). Handing the proxy the bytes directly lets
+        behind a reverse proxy (the self-request can't round-trip to the
+        HA instance's own hostname). Handing the proxy the bytes directly
+        lets
         every media-control card show the cover with zero network dependency.
         Uses a module-level cache so the 472 KB file is read at most once
         per Home Assistant process, shared by all 16 players.

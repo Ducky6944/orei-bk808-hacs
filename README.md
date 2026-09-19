@@ -122,7 +122,7 @@ All services are callable from the UI (Developer Tools → Actions) as well as a
 
 ### Connection failed during setup?
 
-Verify the matrix is reachable by opening its web UI in a browser (e.g. `https://hdmi.local.example.com`). Common causes:
+Verify the matrix is reachable by opening its web UI in a browser (e.g. `https://my-matrix.local`). Common causes:
 
 - Wrong IP address or hostname
 - Firewall blocking HTTPS (port 443)
